@@ -6,9 +6,12 @@ Inicializa FastAPI, registra los routers, arranca el scheduler
 de APScheduler y configura los eventos de inicio y cierre.
 """
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.routers import (
     auth_router, asistente_router,
     alquileres_router, obras_router, panel_router
@@ -76,7 +79,7 @@ app.include_router(obras_router)
 app.include_router(panel_router)
 
 
-@app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 def health_check():
     """Endpoint de verificación de estado del sistema."""
     return {
@@ -85,3 +88,19 @@ def health_check():
         "version": "1.0.0",
         "jobs_activos": [job.name for job in scheduler.get_jobs()],
     }
+
+
+# ── Interfaz web (sirve la SPA en la raíz) ────────────────────────────────────
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+if os.path.isdir(_STATIC_DIR):
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        """Sirve la interfaz web del sistema."""
+        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+else:
+    @app.get("/", tags=["Health"])
+    def root():
+        return {"sistema": "RG S.A.", "docs": "/docs"}

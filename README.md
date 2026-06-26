@@ -1,129 +1,138 @@
 # Sistema de Asistencia Inteligente — RG S.A.
+
 **Trabajo Final de Graduación — Licenciatura en Informática**
 **Universidad Siglo 21 — Gastiazoro, Juan Esteban — VINF011565**
+**Director: Prof. Pablo Virgolini**
 
 ---
 
 ## Descripción
 
-Sistema de asistencia inteligente para la gestión operativa de RG S.A., basado en la técnica
-RAG (Retrieval-Augmented Generation) que cruza datos transaccionales de PostgreSQL con
-documentos vectorizados en pgvector para responder consultas en lenguaje natural mediante GPT-4o.
+Sistema de asistencia inteligente para la gestión operativa de RG S.A., una empresa
+constructora e inmobiliaria PyME de Paraná, Entre Ríos. El sistema centraliza la
+información de alquileres, obras y clientes en una única base de datos relacional y
+permite consultarla en lenguaje natural mediante un asistente conversacional basado en
+la tecnica RAG (Retrieval-Augmented Generation; Lewis et al., 2020). Ademas, automatiza
+las comunicaciones recurrentes (vencimientos, mora, desvios de obra) mediante tareas
+programadas.
 
-**Stack tecnológico:**
-- Backend: Python 3.11 + FastAPI
-- Base de datos: PostgreSQL 16 + pgvector
-- IA: LangChain + OpenAI GPT-4o
-- Automatización: APScheduler
-- Autenticación: JWT + bcrypt
-
----
-
-## Requisitos previos
-
-- Python 3.11+
-- PostgreSQL 16 con extensión pgvector instalada
-- Cuenta de OpenAI con API key activa
+**Stack tecnologico:**
+- Backend: Python 3.12 + FastAPI
+- Base de datos: PostgreSQL 16 (con pgvector opcional)
+- IA: LangChain + OpenAI GPT-4o (modo productivo) / motor basado en reglas (modo demo)
+- Automatizacion: APScheduler
+- Autenticacion: JWT + bcrypt
+- Interfaz: HTML/CSS/JavaScript (SPA servida por FastAPI)
 
 ---
 
-## Instalación
+## Formas de ejecutar el sistema
 
-### 1. Clonar el repositorio
+Hay tres maneras de levantar el prototipo, ordenadas de mas simple a mas manual.
+
+### Opcion A — Docker (recomendada, un solo comando)
+
+Es la forma mas simple: no requiere instalar Python ni PostgreSQL, solo Docker.
 
 ```bash
-git clone https://github.com/[usuario]/rg-asistente-inteligente.git
-cd rg-asistente-inteligente
+docker compose up
 ```
 
-### 2. Crear entorno virtual e instalar dependencias
+Esto levanta la base de datos PostgreSQL (con pgvector), inicializa las tablas, carga
+los datos de demo y arranca el servidor automaticamente. Una vez iniciado:
+
+- Interfaz web:  http://localhost:8000
+- API (Swagger): http://localhost:8000/docs
+
+Para detener: Ctrl+C y luego `docker compose down`.
+
+### Opcion B — Script de arranque automatico
+
+Si se tiene Python y PostgreSQL instalados localmente:
+
+- Windows: doble clic en `iniciar_windows.bat`
+- Linux/macOS: `bash iniciar_linux_mac.sh`
+
+El script crea el entorno virtual, instala dependencias, genera el `.env`, inicializa la
+base de datos y levanta el servidor.
+
+### Opcion C — Instalacion manual paso a paso
 
 ```bash
+# 1. Entorno virtual
 python -m venv venv
-source venv/bin/activate        # Linux/Mac
-venv\Scripts\activate           # Windows
+source venv/bin/activate          # Linux/Mac
+venv\Scripts\activate             # Windows
 
+# 2. Dependencias
 pip install -r requirements.txt
-```
 
-### 3. Configurar variables de entorno
+# 3. Configuracion
+cp .env.example .env              # ajustar DATABASE_URL con los datos de PostgreSQL
 
-```bash
-cp .env.example .env
-```
+# 4. Base de datos (crear previamente en PostgreSQL):
+#    CREATE USER rg_user WITH PASSWORD 'rg2026';
+#    CREATE DATABASE rg_asistente OWNER rg_user;
 
-Editar `.env` con los valores reales:
-- `DATABASE_URL`: URL de conexión a PostgreSQL
-- `OPENAI_API_KEY`: API key de OpenAI
-- `SECRET_KEY`: clave secreta para JWT (mínimo 32 caracteres)
-- Datos SMTP para el envío de notificaciones
-
-### 4. Inicializar la base de datos y cargar datos de demo
-
-```bash
+# 5. Inicializar tablas + datos de demo
 python seed_demo.py
-```
 
-Esto crea todas las tablas, habilita pgvector y carga datos de prueba realistas
-de RG S.A. (contratos, obras, clientes y usuarios).
-
-### 5. Iniciar la aplicación
-
-```bash
+# 6. Levantar
 uvicorn main:app --reload --port 8000
 ```
-
-La API estará disponible en: `http://localhost:8000`
-Documentación interactiva (Swagger): `http://localhost:8000/docs`
-
----
-
-## Uso de la API
-
-### Autenticación
-
-```bash
-curl -X POST http://localhost:8000/auth/token \
-  -d "username=gerencia@rg-sa.com.ar&password=Rg2026!gerencia"
-```
-
-Respuesta:
-```json
-{
-  "access_token": "eyJ...",
-  "token_type": "bearer",
-  "rol": "gerencia"
-}
-```
-
-### Consulta al asistente conversacional
-
-```bash
-curl -X POST http://localhost:8000/asistente/consulta \
-  -H "Authorization: Bearer eyJ..." \
-  -H "Content-Type: application/json" \
-  -d '{"pregunta": "¿Cuántos contratos están en mora?"}'
-```
-
-### Ejemplos de consultas al asistente
-
-| Consulta | Módulo |
-|---|---|
-| ¿Cuántos contratos están en mora? | Alquileres |
-| ¿Cómo va la obra de Av. Uruguay? | Obras |
-| ¿Qué clientes están esperando propuesta? | Comercial |
-| ¿Qué contratos vencen este mes? | Alquileres |
-| Resumí el estado de todas las obras | Obras |
 
 ---
 
 ## Credenciales de demo
 
-| Email | Contraseña | Rol |
+| Email | Contrasena | Rol | Acceso |
+|---|---|---|---|
+| gerencia@rg-sa.com.ar | Rg2026!gerencia | Gerencia | Todos los modulos |
+| admin@rg-sa.com.ar | Rg2026!admin | Administracion | Alquileres y comercial |
+| obras@rg-sa.com.ar | Rg2026!obras | Jefe de obra | Solo obras |
+
+En la pantalla de login se puede hacer clic en cada usuario de demo para autocompletar
+las credenciales.
+
+---
+
+## Tests automatizados
+
+El proyecto incluye una suite de 20 tests que cubren autenticacion, endpoints de cada
+modulo, el motor RAG y el control de acceso por rol:
+
+```bash
+pytest test_sistema.py -v
+```
+
+Los tests requieren que la base de datos este inicializada (`python seed_demo.py`).
+
+---
+
+## Dos versiones del motor RAG
+
+El sistema incluye dos implementaciones del motor conversacional, ambas descriptas en
+el marco teorico del TFG:
+
+| Archivo | Cuando se usa | Requiere |
 |---|---|---|
-| gerencia@rg-sa.com.ar | Rg2026!gerencia | Gerencia (acceso completo) |
-| admin@rg-sa.com.ar | Rg2026!admin | Administración |
-| obras@rg-sa.com.ar | Rg2026!obras | Jefe de obra |
+| `app/rag_engine.py` | Por defecto. Se ejecuta sin configuracion adicional. | Solo PostgreSQL |
+| `app/rag_engine_openai.py` | Implementacion productiva completa | API key de OpenAI + pgvector |
+
+El motor por defecto (`rag_engine.py`) recupera el contexto operativo real desde
+PostgreSQL y genera la respuesta en lenguaje natural mediante reglas de coincidencia
+sobre la intencion de la consulta, replicando el flujo conceptual Retrieval -> Generation
+sin depender de servicios externos. Esto permite que cualquier evaluador clone el
+repositorio y ejecute el sistema completo sin necesidad de credenciales de OpenAI.
+
+Para activar la version completa con GPT-4o y busqueda semantica:
+1. Instalar pgvector: https://github.com/pgvector/pgvector
+2. Configurar `OPENAI_API_KEY` en `.env`
+3. Descomentar `embedding = Column(Vector(1536))` en `app/models.py`
+4. Reemplazar el contenido de `app/rag_engine.py` por el de `app/rag_engine_openai.py`
+
+Ambos archivos comparten la misma firma de funcion, por lo que el resto del sistema no
+requiere cambios al alternar entre ellos.
 
 ---
 
@@ -131,38 +140,58 @@ curl -X POST http://localhost:8000/asistente/consulta \
 
 ```
 rg_asistente/
-├── main.py              # Punto de entrada FastAPI
-├── requirements.txt     # Dependencias Python
-├── seed_demo.py         # Datos de prueba para la demo
-├── .env.example         # Variables de entorno (plantilla)
-├── app/
-│   ├── config.py        # Configuración centralizada
-│   ├── database.py      # Conexión PostgreSQL + init
-│   ├── models.py        # Modelos ORM (13 entidades)
-│   ├── auth.py          # JWT + bcrypt + control de acceso
-│   ├── rag_engine.py    # Motor RAG (núcleo del asistente)
-│   └── routers.py       # Endpoints FastAPI
-└── jobs/
-    └── scheduler.py     # Jobs APScheduler (automatización)
+|-- docker-compose.yml          # Orquestacion Docker (opcion A)
+|-- Dockerfile                  # Imagen de la aplicacion
+|-- iniciar_windows.bat         # Script de arranque Windows (opcion B)
+|-- iniciar_linux_mac.sh        # Script de arranque Linux/Mac (opcion B)
+|-- main.py                     # Punto de entrada FastAPI
+|-- requirements.txt            # Dependencias Python
+|-- seed_demo.py                # Datos de prueba
+|-- test_sistema.py             # Suite de 20 tests automatizados
+|-- .env.example                # Plantilla de variables de entorno
+|-- README.md
+|-- static/
+|   `-- index.html              # Interfaz web (SPA)
+|-- app/
+|   |-- config.py
+|   |-- database.py
+|   |-- models.py               # 13 entidades ORM + DocumentoVectorial
+|   |-- auth.py                 # JWT + bcrypt + control de acceso
+|   |-- rag_engine.py           # Motor RAG - MODO DEMO (activo)
+|   |-- rag_engine_openai.py    # Motor RAG - MODO PRODUCTIVO (referencia)
+|   `-- routers.py              # Endpoints de la API
+`-- jobs/
+    `-- scheduler.py            # Jobs APScheduler (automatizacion)
 ```
 
 ---
 
-## Jobs automáticos
+## Endpoints principales
 
-El sistema ejecuta tres jobs diarios sin intervención manual:
-
-| Job | Hora | Función |
-|---|---|---|
-| verificar_vencimientos | 08:00 | Detecta contratos por vencer (30 y 7 días) |
-| verificar_mora | 08:30 | Detecta mora a partir de 5 días de retraso |
-| verificar_desvios_obra | 09:00 | Detecta etapas de obra demoradas |
+| Metodo | Ruta | Descripcion | Roles |
+|---|---|---|---|
+| POST | `/auth/token` | Login y generacion de JWT | Todos |
+| POST | `/asistente/consulta` | Consulta al motor RAG | Segun permisos |
+| GET | `/alquileres/contratos` | Contratos activos | Gerencia, Administracion |
+| GET | `/alquileres/mora` | Contratos en mora | Gerencia, Administracion |
+| GET | `/obras/` | Obras con avance por etapa | Gerencia, Jefe de obra |
+| GET | `/panel/resumen` | Indicadores ejecutivos | Gerencia |
+| GET | `/api/health` | Estado del sistema | Publico |
 
 ---
 
-## Referencias técnicas
+## Jobs automaticos (APScheduler)
+
+| Job | Hora | Funcion |
+|---|---|---|
+| Verificacion de vencimientos | 08:00 | Detecta contratos por vencer (30 y 7 dias) |
+| Verificacion de mora | 08:30 | Detecta mora a partir de 5 dias de retraso |
+| Verificacion de desvios de obra | 09:00 | Detecta etapas de obra demoradas |
+
+---
+
+## Referencias tecnicas
 
 - Lewis, P. et al. (2020). Retrieval-Augmented Generation for knowledge-intensive NLP tasks.
 - Vaswani, A. et al. (2017). Attention is all you need.
-- Provos, N. & Mazières, D. (1999). A future-adaptable password scheme (bcrypt).
-- Tanenbaum, A. S. & Woodhull, A. S. (2006). Sistemas operativos (APScheduler).
+- Provos, N. & Mazieres, D. (1999). A future-adaptable password scheme (bcrypt).

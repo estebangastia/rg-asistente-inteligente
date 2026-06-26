@@ -1,13 +1,24 @@
 """
 models.py — Modelos ORM del sistema de asistencia inteligente
-RG S.A. — 13 entidades del DER
+RG S.A. — 13 entidades del DER + tabla de soporte vectorial
+
+NOTA SOBRE pgvector: la columna `embedding` se define como Text en esta
+version para que el sistema funcione sin requerir la extension pgvector
+compilada (necesaria solo para la busqueda semantica de
+app/rag_engine_openai.py). Para activar pgvector:
+
+  1. Instalar la extension: https://github.com/pgvector/pgvector
+  2. Descomentar el import de Vector mas abajo
+  3. Reemplazar `embedding = Column(Text, nullable=True)` por
+     `embedding = Column(Vector(1536))` en la clase DocumentoVectorial
 """
 from sqlalchemy import (
     Column, Integer, String, Numeric, Date, DateTime,
     Boolean, Text, ForeignKey, func
 )
 from sqlalchemy.orm import relationship, declarative_base
-# from pgvector.sqlalchemy import Vector
+
+# from pgvector.sqlalchemy import Vector  # Habilitar junto con la extension pgvector
 
 Base = declarative_base()
 
@@ -19,7 +30,7 @@ class Usuario(Base):
     nombre = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    rol = Column(String(50), nullable=False)  # gerencia | administracion | jefe_obra
+    rol = Column(String(50), nullable=False)
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -42,7 +53,7 @@ class Inmueble(Base):
 
     id_inmueble = Column(Integer, primary_key=True, autoincrement=True)
     direccion = Column(String(200), nullable=False)
-    tipo = Column(String(50))  # departamento | local | casa
+    tipo = Column(String(50))
     superficie_m2 = Column(Numeric(8, 2))
     disponible = Column(Boolean, default=True)
 
@@ -58,7 +69,7 @@ class Contrato(Base):
     fecha_inicio = Column(Date, nullable=False)
     fecha_vencimiento = Column(Date, nullable=False)
     monto_mensual = Column(Numeric(12, 2), nullable=False)
-    estado = Column(String(30), default="al_dia")  # al_dia | en_mora | por_vencer | vencido
+    estado = Column(String(30), default="al_dia")
     indice_actualizacion = Column(String(20), default="IPC")
 
     inquilino = relationship("Inquilino", back_populates="contratos")
@@ -74,7 +85,7 @@ class Pago(Base):
     id_contrato = Column(Integer, ForeignKey("contratos.id_contrato"), nullable=False)
     fecha_pago = Column(Date, nullable=False)
     monto = Column(Numeric(12, 2), nullable=False)
-    periodo = Column(String(20))  # e.g. "2026-05"
+    periodo = Column(String(20))
     medio_pago = Column(String(50))
 
     contrato = relationship("Contrato", back_populates="pagos")
@@ -85,10 +96,10 @@ class Notificacion(Base):
 
     id_notificacion = Column(Integer, primary_key=True, autoincrement=True)
     id_contrato = Column(Integer, ForeignKey("contratos.id_contrato"), nullable=False)
-    tipo = Column(String(50))  # vencimiento | mora | desvio_obra | seguimiento_comercial
+    tipo = Column(String(50))
     destinatario = Column(String(150))
     fecha_envio = Column(DateTime, server_default=func.now())
-    estado_envio = Column(String(20), default="pendiente")  # enviado | fallido | pendiente
+    estado_envio = Column(String(20), default="pendiente")
 
     contrato = relationship("Contrato", back_populates="notificaciones")
 
@@ -101,7 +112,7 @@ class Obra(Base):
     direccion = Column(String(200))
     fecha_inicio = Column(Date)
     fecha_fin_estimada = Column(Date)
-    estado = Column(String(30), default="en_curso")  # planificada | en_curso | demorada | finalizada
+    estado = Column(String(30), default="en_curso")
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"))
 
     etapas = relationship("EtapaObra", back_populates="obra")
@@ -191,15 +202,18 @@ class OrdenTrabajo(Base):
 
 class DocumentoVectorial(Base):
     """
-    Tabla para búsqueda semántica con pgvector.
-    Almacena fragmentos de documentos con su embedding.
+    Tabla de soporte para busqueda semantica con pgvector.
+
+    La columna `embedding` se define como Text para que el sistema
+    funcione sin requerir pgvector compilado. Para produccion con
+    busqueda semantica real, ver la nota al inicio de este archivo.
     """
     __tablename__ = "documentos_vectoriales"
 
     id_doc = Column(Integer, primary_key=True, autoincrement=True)
     contenido = Column(Text, nullable=False)
-    embedding = Column(Text, nullable=True)
-    tipo_documento = Column(String(50))  # contrato | presupuesto | obra | general
-    id_referencia = Column(Integer)    # FK flexible al documento original
+    embedding = Column(Text, nullable=True)  # Vector(1536) con pgvector habilitado
+    tipo_documento = Column(String(50))
+    id_referencia = Column(Integer)
     metadata_json = Column(Text)
     created_at = Column(DateTime, server_default=func.now())

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Asistencia Inteligente — RG S.A.</title>
+<style>
+  :root {
+    --azul: #2F5496;
+    --azul-claro: #4472C4;
+    --verde: #2e7d32;
+    --rojo: #c62828;
+    --naranja: #ef6c00;
+    --gris-bg: #f4f6fa;
+    --gris-borde: #e0e4ea;
+    --texto: #1f2733;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+    background: var(--gris-bg);
+    color: var(--texto);
+    line-height: 1.5;
+  }
+  /* ── LOGIN ── */
+  #login-view {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2F5496 0%, #1e3a6e 100%);
+  }
+  .login-card {
+    background: #fff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.2);
+    width: 380px;
+  }
+  .login-card h1 { font-size: 20px; color: var(--azul); margin-bottom: 4px; }
+  .login-card .sub { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--gris-borde);
+    border-radius: 8px; font-size: 14px;
+  }
+  .field input:focus { outline: none; border-color: var(--azul-claro); }
+  .btn {
+    width: 100%; padding: 12px; background: var(--azul); color: #fff;
+    border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: background .2s;
+  }
+  .btn:hover { background: #24407a; }
+  .demo-creds {
+    margin-top: 20px; padding: 14px; background: var(--gris-bg);
+    border-radius: 8px; font-size: 12px; color: #4b5563;
+  }
+  .demo-creds b { color: var(--azul); }
+  .demo-creds .row { cursor: pointer; padding: 3px 0; }
+  .demo-creds .row:hover { color: var(--azul); }
+  .error-msg { color: var(--rojo); font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* ── APP ── */
+  #app-view { display: none; min-height: 100vh; }
+  .topbar {
+    background: var(--azul); color: #fff; padding: 14px 28px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar h1 { font-size: 17px; font-weight: 600; }
+  .topbar .user { font-size: 13px; opacity: .9; }
+  .topbar button {
+    background: rgba(255,255,255,.15); color: #fff; border: none;
+    padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-left: 12px;
+  }
+  .topbar button:hover { background: rgba(255,255,255,.25); }
+  .layout { display: flex; }
+  .sidebar {
+    width: 210px; background: #fff; min-height: calc(100vh - 52px);
+    border-right: 1px solid var(--gris-borde); padding: 16px 0;
+  }
+  .nav-item {
+    padding: 11px 24px; cursor: pointer; font-size: 14px; color: #4b5563;
+    border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: var(--gris-bg); }
+  .nav-item.active { background: #eef3fb; color: var(--azul); border-left-color: var(--azul); font-weight: 600; }
+  .nav-item.disabled { opacity: .4; cursor: not-allowed; }
+  .content { flex: 1; padding: 28px; max-width: 1000px; }
+  .section-title { font-size: 19px; margin-bottom: 20px; color: var(--texto); }
+  .hidden { display: none; }
+
+  /* ── CARDS DEL PANEL ── */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .card {
+    background: #fff; padding: 18px; border-radius: 10px;
+    border: 1px solid var(--gris-borde);
+  }
+  .card .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
+  .card .value { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .card.mora .value { color: var(--rojo); }
+  .card.obras .value { color: var(--naranja); }
+  .card.clientes .value { color: var(--verde); }
+  .card.contratos .value { color: var(--azul); }
+
+  /* ── TABLAS ── */
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+  th { background: var(--azul); color: #fff; text-align: left; padding: 12px 14px; font-size: 13px; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--gris-borde); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge.al_dia { background: #e8f5e9; color: var(--verde); }
+  .badge.en_mora { background: #ffebee; color: var(--rojo); }
+  .badge.por_vencer { background: #fff3e0; color: var(--naranja); }
+  .badge.demorada { background: #ffebee; color: var(--rojo); }
+  .badge.en_curso { background: #e3f2fd; color: var(--azul); }
+
+  /* ── BARRAS DE PROGRESO ── */
+  .progress-bar { background: #eceff4; border-radius: 6px; height: 22px; overflow: hidden; position: relative; min-width: 180px; }
+  .progress-fill { height: 100%; background: var(--azul-claro); display: flex; align-items: center; }
+  .progress-text { position: absolute; right: 8px; top: 2px; font-size: 12px; font-weight: 600; }
+
+  /* ── ASISTENTE ── */
+  .chat-box { background: #fff; border-radius: 10px; border: 1px solid var(--gris-borde); height: 440px; display: flex; flex-direction: column; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 20px; }
+  .msg { margin-bottom: 14px; max-width: 75%; padding: 11px 15px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; }
+  .msg.user { background: var(--azul); color: #fff; margin-left: auto; }
+  .msg.bot { background: var(--gris-bg); color: var(--texto); }
+  .chat-input { display: flex; padding: 14px; border-top: 1px solid var(--gris-borde); gap: 10px; }
+  .chat-input input { flex: 1; padding: 11px 14px; border: 1px solid var(--gris-borde); border-radius: 8px; font-size: 14px; }
+  .chat-input button { padding: 11px 20px; background: var(--azul); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .suggestions { padding: 0 14px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .suggestion { background: #eef3fb; color: var(--azul); padding: 6px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; }
+  .suggestion:hover { background: #dde8f8; }
+  .loader { color: #9ca3af; font-size: 13px; padding: 8px 0; }
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN ════════ -->
+<div id="login-view">
+  <div class="login-card">
+    <h1>Sistema de Asistencia Inteligente</h1>
+    <div class="sub">RG S.A. — Constructora e Inmobiliaria</div>
+    <div class="field">
+      <label>Correo electrónico</label>
+      <input type="email" id="email" placeholder="usuario@rg-sa.com.ar" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" onclick="login()">Ingresar</button>
+    <div class="error-msg" id="login-error"></div>
+    <div class="demo-creds">
+      <b>Usuarios de demo</b> (clic para autocompletar):
+      <div class="row" onclick="fill('gerencia@rg-sa.com.ar','Rg2026!gerencia')">▸ Gerencia — acceso completo</div>
+      <div class="row" onclick="fill('admin@rg-sa.com.ar','Rg2026!admin')">▸ Administración — alquileres y comercial</div>
+      <div class="row" onclick="fill('obras@rg-sa.com.ar','Rg2026!obras')">▸ Jefe de obra — solo obras</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ APP ════════ -->
+<div id="app-view">
+  <div class="topbar">
+    <h1>Sistema de Asistencia Inteligente — RG S.A.</h1>
+    <div>
+      <span class="user" id="user-info"></span>
+      <button onclick="logout()">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="layout">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="content">
+      <!-- PANEL -->
+      <div id="view-panel" class="view">
+        <h2 class="section-title">Panel ejecutivo</h2>
+        <div class="cards">
+          <div class="card contratos"><div class="label">Contratos activos</div><div class="value" id="kpi-contratos">—</div></div>
+          <div class="card mora"><div class="label">En mora</div><div class="value" id="kpi-mora">—</div></div>
+          <div class="card obras"><div class="label">Obras en curso</div><div class="value" id="kpi-obras">—</div></div>
+          <div class="card clientes"><div class="label">Clientes activos</div><div class="value" id="kpi-clientes">—</div></div>
+        </div>
+      </div>
+      <!-- ALQUILERES -->
+      <div id="view-alquileres" class="view hidden">
+        <h2 class="section-title">Gestión de alquileres</h2>
+        <table><thead><tr><th>Inquilino</th><th>Vencimiento</th><th>Monto</th><th>Estado</th></tr></thead>
+        <tbody id="tabla-alquileres"></tbody></table>
+      </div>
+      <!-- OBRAS -->
+      <div id="view-obras" class="view hidden">
+        <h2 class="section-title">Seguimiento de obras</h2>
+        <table><thead><tr><th>Obra</th><th>Avance</th><th>Estado</th></tr></thead>
+        <tbody id="tabla-obras"></tbody></table>
+      </div>
+      <!-- ASISTENTE -->
+      <div id="view-asistente" class="view hidden">
+        <h2 class="section-title">Asistente conversacional</h2>
+        <div class="chat-box">
+          <div class="chat-messages" id="chat-messages">
+            <div class="msg bot">Hola. Soy el asistente de RG S.A. Podés consultarme sobre alquileres, obras o clientes según tu perfil.</div>
+          </div>
+          <div class="suggestions">
+            <div class="suggestion" onclick="askSuggestion('¿Cuántos contratos están en mora?')">Contratos en mora</div>
+            <div class="suggestion" onclick="askSuggestion('¿Cómo van las obras?')">Estado de obras</div>
+            <div class="suggestion" onclick="askSuggestion('¿Qué contratos vencen pronto?')">Próximos vencimientos</div>
+          </div>
+          <div class="chat-input">
+            <input type="text" id="chat-input" placeholder="Escribí tu consulta..." onkeydown="if(event.key==='Enter')sendMessage()">
+            <button onclick="sendMessage()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;  // mismo host que sirve la página
+let token = null;
+let userRol = null;
+
+const MODULOS = {
+  panel:      { label: "Panel ejecutivo", roles: ["gerencia"] },
+  alquileres: { label: "Alquileres", roles: ["gerencia", "administracion"] },
+  obras:      { label: "Obras", roles: ["gerencia", "jefe_obra"] },
+  asistente:  { label: "Asistente IA", roles: ["gerencia", "administracion", "jefe_obra"] },
+};
+
+function fill(email, pass) {
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = pass;
+}
+
+async function login() {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.textContent = '';
+
+  try {
+    const body = new URLSearchParams({ username: email, password: password });
+    const r = await fetch(`${API}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    });
+    if (!r.ok) { errorEl.textContent = 'Credenciales incorrectas.'; return; }
+    const data = await r.json();
+    token = data.access_token;
+    userRol = data.rol;
+    startApp(email);
+  } catch (e) {
+    errorEl.textContent = 'No se pudo conectar con el servidor. ¿Está corriendo en ' + API + '?';
+  }
+}
+
+function startApp(email) {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('app-view').style.display = 'block';
+  document.getElementById('user-info').textContent = `${email} · ${userRol}`;
+  buildSidebar();
+  // Abrir la primera vista disponible para el rol
+  const first = Object.keys(MODULOS).find(m => MODULOS[m].roles.includes(userRol));
+  showView(first);
+}
+
+function buildSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '';
+  for (const [key, mod] of Object.entries(MODULOS)) {
+    const allowed = mod.roles.includes(userRol);
+    const div = document.createElement('div');
+    div.className = 'nav-item' + (allowed ? '' : ' disabled');
+    div.textContent = mod.label;
+    div.id = 'nav-' + key;
+    if (allowed) div.onclick = () => showView(key);
+    sb.appendChild(div);
+  }
+}
+
+function showView(key) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + key).classList.remove('hidden');
+  const nav = document.getElementById('nav-' + key);
+  if (nav) nav.classList.add('active');
+
+  if (key === 'panel') loadPanel();
+  if (key === 'alquileres') loadAlquileres();
+  if (key === 'obras') loadObras();
+}
+
+async function apiGet(path) {
+  const r = await fetch(`${API}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function loadPanel() {
+  try {
+    const d = await apiGet('/panel/resumen');
+    document.getElementById('kpi-contratos').textContent = d.contratos_activos;
+    document.getElementById('kpi-mora').textContent = d.contratos_en_mora;
+    document.getElementById('kpi-obras').textContent = d.obras_en_curso;
+    document.getElementById('kpi-clientes').textContent = d.clientes_activos;
+  } catch (e) { console.error(e); }
+}
+
+async function loadAlquileres() {
+  try {
+    const contratos = await apiGet('/alquileres/contratos');
+    const tbody = document.getElementById('tabla-alquileres');
+    tbody.innerHTML = contratos.map(c => `
+      <tr>
+        <td>${c.inquilino}</td>
+        <td>${formatDate(c.vencimiento)}</td>
+        <td>$${c.monto.toLocaleString('es-AR')}</td>
+        <td><span class="badge ${c.estado}">${estadoLabel(c.estado)}</span></td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function loadObras() {
+  try {
+    const obras = await apiGet('/obras/');
+    const tbody = document.getElementById('tabla-obras');
+    tbody.innerHTML = obras.map(o => `
+      <tr>
+        <td>${o.nombre}</td>
+        <td><div class="progress-bar">
+          <div class="progress-fill" style="width:${o.avance_general}%"></div>
+          <span class="progress-text">${o.avance_general}%</span>
+        </div></td>
+        <td><span class="badge ${o.estado}">${estadoLabel(o.estado)}</span></td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+function askSuggestion(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const pregunta = input.value.trim();
+  if (!pregunta) return;
+  const messages = document.getElementById('chat-messages');
+
+  messages.innerHTML += `<div class="msg user">${escapeHtml(pregunta)}</div>`;
+  input.value = '';
+  const loaderId = 'loader-' + Date.now();
+  messages.innerHTML += `<div class="loader" id="${loaderId}">Consultando...</div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const r = await fetch(`${API}/asistente/consulta`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta })
+    });
+    const data = await r.json();
+    document.getElementById(loaderId).remove();
+    messages.innerHTML += `<div class="msg bot">${escapeHtml(data.respuesta)}</div>`;
+  } catch (e) {
+    document.getElementById(loaderId).remove();
+    messages.innerHTML += `<div class="msg bot">Error al consultar el asistente.</div>`;
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function logout() {
+  token = null; userRol = null;
+  document.getElementById('app-view').style.display = 'none';
+  document.getElementById('login-view').style.display = 'flex';
+  document.getElementById('password').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+// Helpers
+function estadoLabel(e) {
+  return { al_dia: 'Al día', en_mora: 'En mora', por_vencer: 'Por vencer',
+           demorada: 'Demorada', en_curso: 'En curso' }[e] || e;
+}
+function formatDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('es-AR');
+}
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 """
-database.py — Configuración de conexión a PostgreSQL
+database.py — Configuracion de conexion a PostgreSQL
 RG S.A. — Sistema de Asistencia Inteligente
 """
 from sqlalchemy import create_engine, text
@@ -19,6 +19,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db():
+    """Generador de sesion para inyeccion de dependencias en FastAPI."""
     db = SessionLocal()
     try:
         yield db
@@ -27,6 +28,12 @@ def get_db():
 
 
 def init_db():
+    """
+    Inicializa la base de datos:
+      - Intenta habilitar pgvector (opcional; necesario solo para
+        app/rag_engine_openai.py)
+      - Crea todas las tablas definidas en models.py
+    """
     from app.models import Base
     try:
         with engine.connect() as conn:
@@ -34,6 +41,7 @@ def init_db():
             conn.commit()
         print("pgvector habilitado.")
     except Exception:
-        print("Modo demo sin pgvector.")
+        print("pgvector no disponible — el sistema funciona en modo demo sin busqueda vectorial.")
+
     Base.metadata.create_all(bind=engine)
     print("Base de datos inicializada correctamente.")
