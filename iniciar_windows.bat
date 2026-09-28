@@ -23,17 +23,30 @@ echo ====================================================
 echo.
 
 REM 1. Crear entorno virtual si no existe
-if not exist "venv\" (
+REM Se prefiere el lanzador "py" de Windows: el comando "python" puede ser
+REM el acceso directo de la Microsoft Store, que no ejecuta nada.
+if not exist "venv\Scripts\python.exe" (
     echo [1/5] Creando entorno virtual...
-    python -m venv venv
-) else (
-    echo [1/5] Entorno virtual ya existe.
+    py -3.12 -m venv venv 2>nul || py -3 -m venv venv 2>nul || python -m venv venv
 )
+if not exist "venv\Scripts\python.exe" (
+    echo.
+    echo ERROR: no se pudo crear el entorno virtual. Verifique que Python 3.11 o superior
+    echo este instalado ^(https://www.python.org/downloads/^) y desactive los alias de la
+    echo Microsoft Store en Configuracion ^> Aplicaciones ^> Alias de ejecucion de aplicaciones.
+    pause
+    exit /b 1
+)
+echo [1/5] Entorno virtual listo.
 
 REM 2. Activar e instalar dependencias
 echo [2/5] Instalando dependencias...
-call venv\Scripts\activate.bat
-pip install -q -r requirements.txt
+venv\Scripts\python.exe -m pip install -q -r requirements.txt
+if errorlevel 1 (
+    echo ERROR al instalar dependencias.
+    pause
+    exit /b 1
+)
 
 REM 3. Crear .env si no existe
 if not exist ".env" (
@@ -49,8 +62,15 @@ if not exist ".env" (
 )
 
 REM 4. Inicializar base de datos
-echo [4/5] Inicializando base de datos con datos de demo...
-python seed_demo.py
+echo [4/5] Inicializando base de datos (carga datos de demo solo si esta vacia)...
+venv\Scripts\python.exe seed_demo.py
+if errorlevel 1 (
+    echo.
+    echo ERROR al inicializar la base de datos. Revise DATABASE_URL en el archivo .env
+    echo ^(usuario, contrasena y puerto de PostgreSQL^).
+    pause
+    exit /b 1
+)
 
 REM 5. Levantar servidor
 echo [5/5] Levantando servidor...
@@ -61,4 +81,5 @@ echo     - Interfaz web:  http://localhost:8000
 echo     - API (Swagger): http://localhost:8000/docs
 echo ====================================================
 echo.
-uvicorn main:app --reload --port 8000
+venv\Scripts\python.exe -m uvicorn main:app --port 8000
+pause

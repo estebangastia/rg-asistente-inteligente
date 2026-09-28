@@ -133,6 +133,34 @@
   .suggestion { background: #eef3fb; color: var(--azul); padding: 6px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; }
   .suggestion:hover { background: #dde8f8; }
   .loader { color: #9ca3af; font-size: 13px; padding: 8px 0; }
+  .motor { display: block; margin-top: 6px; font-size: 11px; color: #6b7280; }
+  .motor b { color: var(--azul); }
+
+  /* ── SEGURIDAD / USUARIOS ── */
+  .panel-box { background: #fff; border: 1px solid var(--gris-borde); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  .panel-box h3 { font-size: 15px; margin-bottom: 12px; color: var(--azul); }
+  .pol-grid { display: grid; grid-template-columns: 220px 1fr; gap: 6px 14px; font-size: 13px; }
+  .pol-grid div:nth-child(odd) { color: #6b7280; }
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .form-row .field { margin-bottom: 0; flex: 1; min-width: 160px; }
+  .form-row select, .form-row input { width: 100%; padding: 10px 12px; border: 1px solid var(--gris-borde); border-radius: 8px; font-size: 14px; }
+  .btn-sm { padding: 7px 12px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; background: #eef3fb; color: var(--azul); font-weight: 600; margin-right: 4px; }
+  .btn-sm:hover { background: #dde8f8; }
+  .btn-sm.danger { background: #ffebee; color: var(--rojo); }
+  .btn-inline { width: auto; padding: 10px 18px; }
+  .notice { margin-top: 12px; padding: 12px 14px; border-radius: 8px; font-size: 13px; display: none; }
+  .notice.ok { background: #e8f5e9; color: #1b5e20; display: block; }
+  .notice.err { background: #ffebee; color: var(--rojo); display: block; }
+  .notice code { background: #fff; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+  .badge.si { background: #ffebee; color: var(--rojo); }
+  .badge.no { background: #e8f5e9; color: var(--verde); }
+  .evento { font-family: Consolas, monospace; font-size: 12px; }
+  table.compact td, table.compact th { padding: 8px 10px; font-size: 12.5px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal-bg.show { display: flex; }
+  .modal { background: #fff; border-radius: 12px; padding: 28px; width: 420px; }
+  .modal h2 { font-size: 18px; color: var(--azul); margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: #4b5563; margin-bottom: 16px; }
 </style>
 </head>
 <body>
@@ -148,7 +176,7 @@
     </div>
     <div class="field">
       <label>Contraseña</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
     </div>
     <button class="btn" onclick="login()">Ingresar</button>
     <div class="error-msg" id="login-error"></div>
@@ -167,6 +195,7 @@
     <h1>Sistema de Asistencia Inteligente — RG S.A.</h1>
     <div>
       <span class="user" id="user-info"></span>
+      <button onclick="abrirCambioPassword(false)">Cambiar contraseña</button>
       <button onclick="logout()">Cerrar sesión</button>
     </div>
   </div>
@@ -206,14 +235,69 @@
             <div class="suggestion" onclick="askSuggestion('¿Cuántos contratos están en mora?')">Contratos en mora</div>
             <div class="suggestion" onclick="askSuggestion('¿Cómo van las obras?')">Estado de obras</div>
             <div class="suggestion" onclick="askSuggestion('¿Qué contratos vencen pronto?')">Próximos vencimientos</div>
+            <div class="suggestion" onclick="askSuggestion('¿Qué obra está más atrasada y por qué?')">Obra más atrasada</div>
+            <div class="suggestion" onclick="askSuggestion('¿A qué cliente tendría que llamar primero?')">Prioridad comercial</div>
           </div>
           <div class="chat-input">
-            <input type="text" id="chat-input" placeholder="Escribí tu consulta..." onkeydown="if(event.key==='Enter')sendMessage()">
+            <input type="text" id="chat-input" maxlength="500" placeholder="Escribí tu consulta..." onkeydown="if(event.key==='Enter')sendMessage()">
             <button onclick="sendMessage()">Enviar</button>
           </div>
         </div>
       </div>
+      <!-- COMERCIAL -->
+      <div id="view-comercial" class="view hidden">
+        <h2 class="section-title">Pipeline comercial</h2>
+        <table><thead><tr><th>Cliente</th><th>Etapa</th><th>Operación</th><th>Origen</th><th>Sin contacto</th></tr></thead>
+        <tbody id="tabla-comercial"></tbody></table>
+      </div>
+      <!-- USUARIOS -->
+      <div id="view-usuarios" class="view hidden">
+        <h2 class="section-title">Administración de usuarios</h2>
+        <div class="panel-box">
+          <h3>Alta de usuario</h3>
+          <div class="form-row">
+            <div class="field"><label>Nombre</label><input id="nu-nombre" placeholder="Nombre y apellido"></div>
+            <div class="field"><label>Correo institucional</label><input id="nu-email" type="email" placeholder="usuario@rg-sa.com.ar"></div>
+            <div class="field"><label>Rol</label>
+              <select id="nu-rol"><option value="administracion">Administración</option><option value="jefe_obra">Jefe de obra</option><option value="gerencia">Gerencia</option></select></div>
+            <button class="btn btn-inline" onclick="altaUsuario()">Crear usuario</button>
+          </div>
+          <div class="notice" id="nu-msg"></div>
+        </div>
+        <table class="compact"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th>Bloqueado</th><th>Debe cambiar clave</th><th>Acciones</th></tr></thead>
+        <tbody id="tabla-usuarios"></tbody></table>
+      </div>
+      <!-- SEGURIDAD -->
+      <div id="view-seguridad" class="view hidden">
+        <h2 class="section-title">Seguridad del sistema</h2>
+        <div class="panel-box"><h3>Controles activos</h3><div class="pol-grid" id="politicas"></div></div>
+        <div class="panel-box">
+          <h3>Copias de seguridad</h3>
+          <button class="btn-sm" onclick="generarBackup()">Generar copia ahora</button>
+          <button class="btn-sm" onclick="verificarBackup()">Probar restauración de la última copia</button>
+          <div class="notice" id="bk-msg"></div>
+          <table class="compact" style="margin-top:12px"><thead><tr><th>Archivo</th><th>Fecha</th><th>Tamaño</th></tr></thead><tbody id="tabla-backups"></tbody></table>
+        </div>
+        <div class="panel-box">
+          <h3>Log de auditoría (últimos 100 eventos)</h3>
+          <table class="compact"><thead><tr><th>Fecha (UTC)</th><th>Usuario</th><th>Evento</th><th>Detalle</th><th>IP</th></tr></thead><tbody id="tabla-auditoria"></tbody></table>
+        </div>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- ════════ CAMBIO DE CONTRASEÑA ════════ -->
+<div class="modal-bg" id="modal-pwd">
+  <div class="modal">
+    <h2>Cambiar contraseña</h2>
+    <p id="pwd-motivo">Mínimo 8 caracteres, con mayúscula, minúscula, número y carácter especial. No puede repetir ninguna de sus últimas 3 contraseñas.</p>
+    <div class="field"><label>Contraseña actual</label><input type="password" id="pwd-actual" autocomplete="current-password"></div>
+    <div class="field"><label>Nueva contraseña</label><input type="password" id="pwd-nueva" autocomplete="new-password"></div>
+    <div class="field"><label>Repetir nueva contraseña</label><input type="password" id="pwd-nueva2" autocomplete="new-password"></div>
+    <button class="btn" onclick="guardarPassword()">Guardar</button>
+    <div class="error-msg" id="pwd-error"></div>
+    <div style="text-align:center;margin-top:8px"><a href="#" id="pwd-cancelar" onclick="cerrarCambioPassword();return false" style="font-size:13px;color:#6b7280">Cancelar</a></div>
   </div>
 </div>
 
@@ -222,11 +306,18 @@ const API = window.location.origin;  // mismo host que sirve la página
 let token = null;
 let userRol = null;
 
+let userEmail = null;
+let userNombre = null;
+let cambioObligatorio = false;
+
 const MODULOS = {
   panel:      { label: "Panel ejecutivo", roles: ["gerencia"] },
   alquileres: { label: "Alquileres", roles: ["gerencia", "administracion"] },
   obras:      { label: "Obras", roles: ["gerencia", "jefe_obra"] },
+  comercial:  { label: "Comercial", roles: ["gerencia", "administracion"] },
   asistente:  { label: "Asistente IA", roles: ["gerencia", "administracion", "jefe_obra"] },
+  usuarios:   { label: "Usuarios", roles: ["gerencia"] },
+  seguridad:  { label: "Seguridad", roles: ["gerencia"] },
 };
 
 function fill(email, pass) {
@@ -247,10 +338,16 @@ async function login() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body
     });
-    if (!r.ok) { errorEl.textContent = 'Credenciales incorrectas.'; return; }
     const data = await r.json();
+    if (!r.ok) { errorEl.textContent = data.detail || 'Credenciales incorrectas.'; return; }
     token = data.access_token;
     userRol = data.rol;
+    userEmail = email;
+    userNombre = data.nombre;
+    if (data.debe_cambiar_password) {
+      abrirCambioPassword(true);
+      return;
+    }
     startApp(email);
   } catch (e) {
     errorEl.textContent = 'No se pudo conectar con el servidor. ¿Está corriendo en ' + API + '?';
@@ -260,7 +357,7 @@ async function login() {
 function startApp(email) {
   document.getElementById('login-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'block';
-  document.getElementById('user-info').textContent = `${email} · ${userRol}`;
+  document.getElementById('user-info').textContent = `${userNombre || email} · ${rolLabel(userRol)}`;
   buildSidebar();
   // Abrir la primera vista disponible para el rol
   const first = Object.keys(MODULOS).find(m => MODULOS[m].roles.includes(userRol));
@@ -291,13 +388,22 @@ function showView(key) {
   if (key === 'panel') loadPanel();
   if (key === 'alquileres') loadAlquileres();
   if (key === 'obras') loadObras();
+  if (key === 'comercial') loadComercial();
+  if (key === 'usuarios') loadUsuarios();
+  if (key === 'seguridad') loadSeguridad();
 }
 
-async function apiGet(path) {
-  const r = await fetch(`${API}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Authorization': `Bearer ${token}` } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(`${API}${path}`, opts);
+  if (r.status === 401) { logout('Tu sesión expiró. Ingresá nuevamente.'); throw new Error('401'); }
+  if (r.status === 403 && r.headers.get('X-Requiere-Cambio-Password')) { abrirCambioPassword(true); throw new Error('403'); }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(data.detail || r.status); e.detail = data.detail; throw e; }
+  return data;
 }
+const apiGet = (path) => api(path);
 
 async function loadPanel() {
   try {
@@ -315,7 +421,7 @@ async function loadAlquileres() {
     const tbody = document.getElementById('tabla-alquileres');
     tbody.innerHTML = contratos.map(c => `
       <tr>
-        <td>${c.inquilino}</td>
+        <td>${escapeHtml(c.inquilino)}</td>
         <td>${formatDate(c.vencimiento)}</td>
         <td>$${c.monto.toLocaleString('es-AR')}</td>
         <td><span class="badge ${c.estado}">${estadoLabel(c.estado)}</span></td>
@@ -329,7 +435,7 @@ async function loadObras() {
     const tbody = document.getElementById('tabla-obras');
     tbody.innerHTML = obras.map(o => `
       <tr>
-        <td>${o.nombre}</td>
+        <td>${escapeHtml(o.nombre)}</td>
         <td><div class="progress-bar">
           <div class="progress-fill" style="width:${o.avance_general}%"></div>
           <span class="progress-text">${o.avance_general}%</span>
@@ -357,30 +463,166 @@ async function sendMessage() {
   messages.scrollTop = messages.scrollHeight;
 
   try {
-    const r = await fetch(`${API}/asistente/consulta`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pregunta })
-    });
-    const data = await r.json();
+    const data = await api('/asistente/consulta', 'POST', { pregunta });
     document.getElementById(loaderId).remove();
-    messages.innerHTML += `<div class="msg bot">${escapeHtml(data.respuesta)}</div>`;
+    messages.innerHTML += `<div class="msg bot">${formatoRespuesta(data.respuesta)}<span class="motor">Respondido por: <b>${escapeHtml(data.motor)}</b></span></div>`;
   } catch (e) {
-    document.getElementById(loaderId).remove();
+    const l = document.getElementById(loaderId); if (l) l.remove();
     messages.innerHTML += `<div class="msg bot">Error al consultar el asistente.</div>`;
   }
   messages.scrollTop = messages.scrollHeight;
 }
 
-function logout() {
-  token = null; userRol = null;
+function logout(mensaje) {
+  token = null; userRol = null; userEmail = null; userNombre = null;
+  cerrarCambioPassword(true);
   document.getElementById('app-view').style.display = 'none';
   document.getElementById('login-view').style.display = 'flex';
   document.getElementById('password').value = '';
-  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-error').textContent = typeof mensaje === 'string' ? mensaje : '';
+}
+
+// ── Cambio de contraseña ──
+function abrirCambioPassword(obligatorio) {
+  cambioObligatorio = obligatorio;
+  ['pwd-actual','pwd-nueva','pwd-nueva2'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pwd-error').textContent = '';
+  document.getElementById('pwd-cancelar').style.display = obligatorio ? 'none' : 'inline';
+  document.getElementById('pwd-motivo').innerHTML = (obligatorio
+    ? '<b>Tu contraseña es inicial o venció (90 días): tenés que cambiarla para continuar.</b><br>' : '') +
+    'Mínimo 8 caracteres, con mayúscula, minúscula, número y carácter especial. No puede repetir ninguna de sus últimas 3 contraseñas.';
+  document.getElementById('modal-pwd').classList.add('show');
+}
+function cerrarCambioPassword(forzar) {
+  if (cambioObligatorio && !forzar) return;
+  document.getElementById('modal-pwd').classList.remove('show');
+}
+async function guardarPassword() {
+  const actual = document.getElementById('pwd-actual').value;
+  const nueva = document.getElementById('pwd-nueva').value;
+  const err = document.getElementById('pwd-error');
+  if (nueva !== document.getElementById('pwd-nueva2').value) { err.textContent = 'Las contraseñas nuevas no coinciden.'; return; }
+  try {
+    await api('/auth/cambiar-password', 'POST', { password_actual: actual, password_nueva: nueva });
+    const eraObligatorio = cambioObligatorio;
+    cambioObligatorio = false;
+    cerrarCambioPassword(true);
+    if (eraObligatorio) startApp(userEmail);
+    else alertaFlotante('Contraseña actualizada.');
+  } catch (e) { err.textContent = e.detail || 'No se pudo cambiar la contraseña.'; }
+}
+function alertaFlotante(t) {
+  const d = document.createElement('div');
+  d.textContent = t;
+  d.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1b5e20;color:#fff;padding:12px 18px;border-radius:8px;font-size:14px;z-index:20';
+  document.body.appendChild(d); setTimeout(() => d.remove(), 3000);
+}
+
+// ── Comercial ──
+async function loadComercial() {
+  try {
+    const ops = await apiGet('/comercial/oportunidades');
+    document.getElementById('tabla-comercial').innerHTML = ops.map(o => `
+      <tr><td>${escapeHtml(o.cliente)}</td><td>${escapeHtml(etapaLabel(o.etapa))}</td><td>${escapeHtml(o.tipo_operacion || '')}</td>
+      <td>${escapeHtml(o.origen || '')}</td><td>${o.dias_sin_contacto ?? '—'} días</td></tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+// ── Usuarios ──
+async function loadUsuarios() {
+  try {
+    const us = await apiGet('/usuarios/');
+    document.getElementById('tabla-usuarios').innerHTML = us.map(u => `
+      <tr><td>${escapeHtml(u.nombre)}</td><td>${escapeHtml(u.email)}</td><td>${rolLabel(u.rol)}</td>
+      <td><span class="badge ${u.activo ? 'no' : 'si'}">${u.activo ? 'Sí' : 'No'}</span></td>
+      <td><span class="badge ${u.bloqueado ? 'si' : 'no'}">${u.bloqueado ? 'Sí' : 'No'}</span></td>
+      <td>${u.debe_cambiar_password ? 'Sí' : 'No'}</td>
+      <td>${u.email === userEmail ? '' : `
+        ${u.activo && !u.bloqueado ? `<button class="btn-sm danger" onclick="accionUsuario(${u.id_usuario},'desactivar')">Desactivar</button>` : `<button class="btn-sm" onclick="accionUsuario(${u.id_usuario},'activar')">${u.activo ? 'Desbloquear' : 'Activar'}</button>`}
+        <button class="btn-sm" onclick="accionUsuario(${u.id_usuario},'forzar-cambio')">Forzar cambio de clave</button>`}</td></tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+async function altaUsuario() {
+  const msg = document.getElementById('nu-msg');
+  msg.className = 'notice';
+  try {
+    const r = await api('/usuarios/', 'POST', {
+      nombre: document.getElementById('nu-nombre').value,
+      email: document.getElementById('nu-email').value,
+      rol: document.getElementById('nu-rol').value,
+    });
+    msg.className = 'notice ok';
+    msg.innerHTML = r.correo_enviado
+      ? `Usuario creado. La contraseña inicial se envió por correo a ${escapeHtml(r.usuario.email)}.`
+      : `Usuario creado. Contraseña inicial: <code>${escapeHtml(r.password_inicial)}</code><br><small>${escapeHtml(r.aviso)}</small>`;
+    document.getElementById('nu-nombre').value = ''; document.getElementById('nu-email').value = '';
+    loadUsuarios();
+  } catch (e) {
+    msg.className = 'notice err';
+    msg.textContent = typeof e.detail === 'string' ? e.detail : 'Revisá los datos: nombre, correo válido y rol.';
+  }
+}
+async function accionUsuario(id, accion) {
+  try { await api(`/usuarios/${id}/${accion}`, 'POST'); loadUsuarios(); }
+  catch (e) { alert(e.detail || 'No se pudo completar la acción.'); }
+}
+
+// ── Seguridad ──
+async function loadSeguridad() {
+  try {
+    const p = await apiGet('/seguridad/politicas');
+    const filas = [
+      ['Almacenamiento de contraseñas', p.hash_passwords], ['Sesión', p.token],
+      ['Bloqueo de cuenta', p.bloqueo], ['Complejidad de contraseña', p.complejidad],
+      ['Vigencia de contraseña', p.vigencia_password_dias + ' días'],
+      ['Historial (no reutilizar)', 'últimas ' + p.historial_passwords],
+      ['Alta de usuarios', p.alta_usuarios],
+      ['Permisos por rol', Object.entries(p.roles).map(([r, m]) => rolLabel(r) + ': ' + m.join(', ')).join(' · ')],
+    ];
+    document.getElementById('politicas').innerHTML = filas.map(([a, b]) => `<div>${a}</div><div>${escapeHtml(String(b))}</div>`).join('');
+    loadBackups();
+    const ev = await apiGet('/seguridad/auditoria?limite=100');
+    document.getElementById('tabla-auditoria').innerHTML = ev.map(e => `
+      <tr><td>${e.fecha ? e.fecha.replace('T', ' ').slice(0, 19) : ''}</td><td>${escapeHtml(e.email || '')}</td>
+      <td class="evento">${escapeHtml(e.evento)}</td><td>${escapeHtml(e.detalle || '')}</td><td>${escapeHtml(e.ip || '')}</td></tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+async function loadBackups() {
+  try {
+    const b = await apiGet('/seguridad/backups');
+    document.getElementById('tabla-backups').innerHTML = b.length ? b.map(x =>
+      `<tr><td>${escapeHtml(x.archivo)}</td><td>${x.fecha}</td><td>${x.tamano_kb} KB</td></tr>`).join('')
+      : '<tr><td colspan="3">Todavía no hay copias. La copia automática se genera todos los días a las 00:00.</td></tr>';
+  } catch (e) { console.error(e); }
+}
+async function generarBackup() {
+  const msg = document.getElementById('bk-msg');
+  msg.className = 'notice ok'; msg.textContent = 'Generando copia...';
+  try {
+    const r = await api('/seguridad/backups', 'POST');
+    msg.textContent = `Copia generada: ${r.archivo} (${r.tamano_kb} KB).`;
+    loadBackups();
+  } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error al generar la copia.'; }
+}
+async function verificarBackup() {
+  const msg = document.getElementById('bk-msg');
+  msg.className = 'notice ok'; msg.textContent = 'Restaurando la última copia en una base temporal...';
+  try {
+    const r = await api('/seguridad/backups/verificar', 'POST');
+    const filas = Object.entries(r.tablas).map(([t, v]) => `${t}: ${v.produccion} / ${v.backup}`).join(' · ');
+    msg.className = r.resultado === 'OK' ? 'notice ok' : 'notice err';
+    msg.innerHTML = `Prueba de restauración de <b>${escapeHtml(r.archivo)}</b>: <b>${r.resultado}</b><br><small>Registros producción / copia — ${escapeHtml(filas)}</small>`;
+  } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error en la prueba de restauración.'; }
 }
 
 // Helpers
+function rolLabel(r) {
+  return { gerencia: 'Gerencia', administracion: 'Administración', jefe_obra: 'Jefe de obra' }[r] || r;
+}
+function etapaLabel(e) {
+  return { consulta_recibida: 'Consulta recibida', propuesta_enviada: 'Propuesta enviada',
+           contrato_en_proceso: 'Contrato en proceso' }[e] || e;
+}
 function estadoLabel(e) {
   return { al_dia: 'Al día', en_mora: 'En mora', por_vencer: 'Por vencer',
            demorada: 'Demorada', en_curso: 'En curso' }[e] || e;
@@ -389,8 +631,14 @@ function formatDate(iso) {
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('es-AR');
 }
+// Formato mínimo para las respuestas del modelo: **negrita** y viñetas
+function formatoRespuesta(t) {
+  return escapeHtml(t)
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/^(\s*)[-*] /gm, '$1• ');
+}
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 </body>

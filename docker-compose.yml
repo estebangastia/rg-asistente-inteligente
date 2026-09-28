@@ -22,19 +22,25 @@ services:
     environment:
       DATABASE_URL: postgresql://rg_user:rg2026@db:5432/rg_asistente
       OPENAI_API_KEY: sk-demo-no-se-usa-en-modo-demo
+      # Modelo de lenguaje: completar LLM_API_KEY (por ejemplo, una key gratuita de Groq)
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       SECRET_KEY: clave_secreta_desarrollo_tfg_rg_sa_2026_min32chars
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_HOURS: 8
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
-      SMTP_USER: notificaciones@rg-sa.com.ar
-      SMTP_PASSWORD: demo
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
       EMAIL_FROM: notificaciones@rg-sa.com.ar
     ports:
       - "8000:8000"
+    volumes:
+      - backups:/app/backups
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  backups:

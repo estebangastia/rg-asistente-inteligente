@@ -205,7 +205,7 @@ def test_health_check():
     r = client.get("/api/health")
     assert r.status_code == 200
     assert r.json()["estado"] == "operativo"
-    assert len(r.json()["jobs_activos"]) == 3  # 3 jobs de APScheduler
+    assert len(r.json()["jobs_activos"]) == 4  # 3 jobs de negocio + backup diario
 
 
 if __name__ == "__main__":

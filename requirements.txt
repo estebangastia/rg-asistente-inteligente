@@ -1,17 +1,24 @@
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-pgvector
-langchain
-langchain-openai
-langchain-community
-openai
-python-jose[cryptography]
-passlib[bcrypt]==1.7.4
+# Versiones fijadas y probadas (Python 3.11 – 3.13) para que la instalación
+# sea reproducible: una versión nueva de alguna librería no rompe el prototipo.
+fastapi==0.141.1
+uvicorn==0.54.0
+starlette==1.7.0
+sqlalchemy==2.1.1
+psycopg2-binary==2.9.13
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+python-multipart==0.0.32
+python-jose[cryptography]==3.5.0
 bcrypt==4.0.1
-python-dotenv
-apscheduler
-pydantic
-pydantic-settings
-python-multipart
+apscheduler==3.11.3
+tzdata
+# Motor RAG: LangChain + cualquier API compatible con OpenAI (Groq, OpenAI, Gemini, OpenRouter)
+langchain-openai==1.6.6
+langchain-core==1.6.5
+openai==3.19.2
+# Solo para la variante con búsqueda semántica (app/rag_engine_openai.py)
+pgvector==0.5.0
+# Tests
+pytest
+httpx==0.28.1

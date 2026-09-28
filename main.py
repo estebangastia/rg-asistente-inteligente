@@ -13,9 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.routers import (
-    auth_router, asistente_router,
-    alquileres_router, obras_router, panel_router
+    auth_router, asistente_router, alquileres_router, obras_router,
+    comercial_router, panel_router, usuarios_router, seguridad_router
 )
+from app.rag_engine import descripcion_motor
+from app.config import get_settings
 from app.database import init_db
 from jobs.scheduler import crear_scheduler
 
@@ -39,6 +41,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Iniciando Sistema de Asistencia Inteligente — RG S.A.")
     init_db()
+    logger.info(f"Motor del asistente: {descripcion_motor()}")
+    if get_settings().secret_key in ("clave_secreta_desarrollo", "cambia_esto_por_una_clave_segura_de_32_caracteres"):
+        logger.warning("SECRET_KEY es la clave de ejemplo: cambiarla antes de usar en producción.")
     scheduler.start()
     logger.info(f"Scheduler iniciado con {len(scheduler.get_jobs())} jobs activos.")
     for job in scheduler.get_jobs():
@@ -56,11 +61,28 @@ app = FastAPI(
     description=(
         "API REST del sistema de asistencia inteligente para la gestión operativa "
         "de RG S.A. Implementa un motor RAG (Lewis et al., 2020) sobre PostgreSQL "
-        "con búsqueda semántica pgvector y automatización con APScheduler."
+        "con un modelo de lenguaje vía LangChain, controles de seguridad alineados "
+        "con ISO/IEC 27001 y automatización con APScheduler."
     ),
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def cabeceras_seguridad(request, call_next):
+    """
+    Cabeceras HTTP de seguridad en todas las respuestas:
+    evitan que la interfaz se incruste en otros sitios (clickjacking),
+    que el navegador interprete tipos de archivo incorrectos y que se
+    filtre la URL a sitios externos.
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = response.headers.get("Cache-Control", "no-store")
+    return response
 
 # CORS — en producción restringir a los orígenes del frontend
 app.add_middleware(
@@ -76,7 +98,10 @@ app.include_router(auth_router)
 app.include_router(asistente_router)
 app.include_router(alquileres_router)
 app.include_router(obras_router)
+app.include_router(comercial_router)
 app.include_router(panel_router)
+app.include_router(usuarios_router)
+app.include_router(seguridad_router)
 
 
 @app.get("/api/health", tags=["Health"])
@@ -85,7 +110,8 @@ def health_check():
     return {
         "sistema": "RG S.A. — Asistente Inteligente",
         "estado": "operativo",
-        "version": "1.0.0",
+        "version": "1.1.0",
+        "motor_ia": descripcion_motor(),
         "jobs_activos": [job.name for job in scheduler.get_jobs()],
     }
 

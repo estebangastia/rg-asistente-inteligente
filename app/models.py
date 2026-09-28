@@ -34,6 +34,13 @@ class Usuario(Base):
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
+    # ── Campos de seguridad (sección Seguridad del TFG, ISO/IEC 27001) ──
+    intentos_fallidos = Column(Integer, default=0, nullable=False)
+    bloqueado_hasta = Column(DateTime, nullable=True)        # bloqueo temporal de 15 min
+    debe_cambiar_password = Column(Boolean, default=False, nullable=False)
+    password_actualizada = Column(DateTime, server_default=func.now())  # vence a los 90 días
+    ultimo_acceso = Column(DateTime, nullable=True)
+
 
 class Inquilino(Base):
     __tablename__ = "inquilinos"
@@ -217,3 +224,30 @@ class DocumentoVectorial(Base):
     id_referencia = Column(Integer)
     metadata_json = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ── TABLAS DE SOPORTE DE SEGURIDAD ────────────────────────────────────────────
+# No forman parte de las 13 entidades de negocio del DER: implementan los
+# controles descriptos en la sección Seguridad (historial de contraseñas y
+# log de auditoría).
+
+class HistorialPassword(Base):
+    """Últimas contraseñas de cada usuario (hash), para impedir su reutilización."""
+    __tablename__ = "historial_passwords"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    fecha = Column(DateTime, server_default=func.now())
+
+
+class LogAuditoria(Base):
+    """Registro de eventos de seguridad: accesos, bloqueos, altas y cambios."""
+    __tablename__ = "log_auditoria"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fecha = Column(DateTime, server_default=func.now(), index=True)
+    email = Column(String(150))
+    evento = Column(String(50), nullable=False)
+    detalle = Column(Text)
+    ip = Column(String(64))

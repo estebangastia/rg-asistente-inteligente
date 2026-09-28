@@ -19,9 +19,11 @@ programadas.
 **Stack tecnologico:**
 - Backend: Python 3.12 + FastAPI
 - Base de datos: PostgreSQL 16 (con pgvector opcional)
-- IA: LangChain + OpenAI GPT-4o (modo productivo) / motor basado en reglas (modo demo)
-- Automatizacion: APScheduler
-- Autenticacion: JWT + bcrypt
+- IA: LangChain + modelo de lenguaje configurable (OpenAI GPT-4o en produccion; Groq,
+  Gemini u OpenRouter gratuitos para la demo) con respaldo automatico a un motor de reglas
+- Automatizacion: APScheduler (notificaciones y copia de seguridad diaria)
+- Seguridad: JWT + bcrypt, bloqueo por intentos, politica y vencimiento de contrasenas,
+  alta de usuarios por Gerencia, log de auditoria, respaldo con prueba de restauracion
 - Interfaz: HTML/CSS/JavaScript (SPA servida por FastAPI)
 
 ---
@@ -74,8 +76,9 @@ cp .env.example .env              # ajustar DATABASE_URL con los datos de Postgr
 #    CREATE USER rg_user WITH PASSWORD 'rg2026';
 #    CREATE DATABASE rg_asistente OWNER rg_user;
 
-# 5. Inicializar tablas + datos de demo
+# 5. Inicializar tablas + datos de demo (solo si la base esta vacia)
 python seed_demo.py
+#    Para volver a los datos de demo originales: python seed_demo.py --reiniciar
 
 # 6. Levantar
 uvicorn main:app --reload --port 8000
@@ -96,36 +99,83 @@ las credenciales.
 
 ---
 
-## Tests automatizados
+## Activar el modelo de lenguaje (opcional, gratis)
 
-El proyecto incluye una suite de 20 tests que cubren autenticacion, endpoints de cada
-modulo, el motor RAG y el control de acceso por rol:
+Sin configuracion, el asistente responde con el motor de reglas local. Para que
+responda un modelo de lenguaje real:
+
+1. Crear una API key gratuita en https://console.groq.com/keys (no pide tarjeta).
+2. En el archivo `.env` completar:
+   ```
+   LLM_PROVIDER=groq
+   LLM_API_KEY=gsk_...
+   ```
+3. Reiniciar el servidor. En `http://localhost:8000/api/health` el campo `motor_ia`
+   muestra el modelo activo, y cada respuesta del asistente indica que motor la genero.
+
+Tambien funciona con `LLM_PROVIDER=openai` (GPT-4o, pago), `gemini` u `openrouter`.
+Si el proveedor no responde (sin internet o limite de uso alcanzado), el asistente
+vuelve automaticamente al motor de reglas: la demo nunca queda sin respuesta.
+
+---
+
+## Seguridad implementada
+
+| Control | Implementacion |
+|---|---|
+| Almacenamiento de contrasenas | bcrypt con 12 rondas y salt aleatorio |
+| Sesion | JWT HS256 de 8 horas; solo contiene email y rol |
+| Control de acceso | Permisos por rol en cada endpoint y en el contexto del asistente |
+| Bloqueo de cuenta | 5 intentos fallidos consecutivos → 15 minutos |
+| Complejidad | 8+ caracteres, mayuscula, minuscula, numero y caracter especial |
+| Vencimiento | Cambio obligatorio a los 90 dias; no se repiten las ultimas 3 |
+| Alta de usuarios | Solo Gerencia; contrasena inicial aleatoria con cambio en el primer ingreso |
+| Baja | Desactivacion sin borrado, conserva la trazabilidad |
+| Auditoria | Login ok/fallido, bloqueos, accesos denegados, altas, cambios, backups, consultas |
+| Cabeceras HTTP | X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
+| Respaldo | Copia diaria 00:00 con pg_dump, retencion 7 dias, prueba de restauracion |
+
+Todo se puede ver desde la interfaz con el usuario de Gerencia, en las secciones
+**Usuarios** y **Seguridad**.
+
+### Copias de seguridad por consola
 
 ```bash
-pytest test_sistema.py -v
+python backup.py              # genera una copia ahora (carpeta backups/)
+python backup.py --verificar  # restaura la ultima copia en una base temporal y compara
+python backup.py --listar     # lista las copias disponibles
+```
+
+Requiere `pg_dump` y `pg_restore` (vienen con PostgreSQL). En Windows se detectan
+solos en `C:\Program Files\PostgreSQL\<version>\bin`; si no, configurar `PG_BIN_DIR`.
+
+---
+
+## Tests automatizados
+
+El proyecto incluye 49 tests: autenticacion, endpoints de cada modulo, motor RAG,
+control de acceso por rol, controles de seguridad y respaldo.
+
+```bash
+pytest -v
 ```
 
 Los tests requieren que la base de datos este inicializada (`python seed_demo.py`).
 
 ---
 
-## Dos versiones del motor RAG
+## Motor RAG
 
-El sistema incluye dos implementaciones del motor conversacional, ambas descriptas en
-el marco teorico del TFG:
+`app/rag_engine.py` (activo):
+1. **Recuperacion:** consulta PostgreSQL y arma el contexto (alquileres, obras, pipeline)
+   solo con los modulos permitidos para el rol del usuario.
+2. **Generacion:** envia contexto y pregunta al modelo de lenguaje via LangChain. Si no
+   hay modelo configurado o no responde, genera la respuesta con reglas locales.
 
-| Archivo | Cuando se usa | Requiere |
-|---|---|---|
-| `app/rag_engine.py` | Por defecto. Se ejecuta sin configuracion adicional. | Solo PostgreSQL |
-| `app/rag_engine_openai.py` | Implementacion productiva completa | API key de OpenAI + pgvector |
+`app/rag_engine_openai.py` (referencia): agrega busqueda semantica sobre documentos
+(contratos en PDF, presupuestos) con embeddings de OpenAI y pgvector.
 
-El motor por defecto (`rag_engine.py`) recupera el contexto operativo real desde
-PostgreSQL y genera la respuesta en lenguaje natural mediante reglas de coincidencia
-sobre la intencion de la consulta, replicando el flujo conceptual Retrieval -> Generation
-sin depender de servicios externos. Esto permite que cualquier evaluador clone el
-repositorio y ejecute el sistema completo sin necesidad de credenciales de OpenAI.
-
-Para activar la version completa con GPT-4o y busqueda semantica:
+Para activar la variante con busqueda semantica:
 1. Instalar pgvector: https://github.com/pgvector/pgvector
 2. Configurar `OPENAI_API_KEY` en `.env`
 3. Descomentar `embedding = Column(Vector(1536))` en `app/models.py`
@@ -146,8 +196,11 @@ rg_asistente/
 |-- iniciar_linux_mac.sh        # Script de arranque Linux/Mac (opcion B)
 |-- main.py                     # Punto de entrada FastAPI
 |-- requirements.txt            # Dependencias Python
-|-- seed_demo.py                # Datos de prueba
-|-- test_sistema.py             # Suite de 20 tests automatizados
+|-- seed_demo.py                # Datos de prueba (--reiniciar para volver al estado inicial)
+|-- backup.py                   # Copia de seguridad y prueba de restauracion
+|-- test_sistema.py             # Tests de modulos, asistente y roles
+|-- test_seguridad.py           # Tests de seguridad, asistente y respaldo
+|-- GUIA_DEMO.md                # Guion para la demostracion en vivo
 |-- .env.example                # Plantilla de variables de entorno
 |-- README.md
 |-- static/
@@ -155,10 +208,12 @@ rg_asistente/
 |-- app/
 |   |-- config.py
 |   |-- database.py
-|   |-- models.py               # 13 entidades ORM + DocumentoVectorial
-|   |-- auth.py                 # JWT + bcrypt + control de acceso
-|   |-- rag_engine.py           # Motor RAG - MODO DEMO (activo)
-|   |-- rag_engine_openai.py    # Motor RAG - MODO PRODUCTIVO (referencia)
+|   |-- models.py               # 13 entidades ORM + tablas de soporte (seguridad, vectorial)
+|   |-- auth.py                 # JWT + bcrypt + control de acceso por rol
+|   |-- seguridad.py            # Bloqueo, politica de contrasenas, historial, auditoria
+|   |-- respaldo.py             # pg_dump, retencion y prueba de restauracion
+|   |-- rag_engine.py           # Motor RAG activo (LangChain + LLM, con respaldo por reglas)
+|   |-- rag_engine_openai.py    # Variante con busqueda semantica pgvector (referencia)
 |   `-- routers.py              # Endpoints de la API
 `-- jobs/
     `-- scheduler.py            # Jobs APScheduler (automatizacion)
@@ -170,7 +225,13 @@ rg_asistente/
 
 | Metodo | Ruta | Descripcion | Roles |
 |---|---|---|---|
-| POST | `/auth/token` | Login y generacion de JWT | Todos |
+| POST | `/auth/token` | Login y generacion de JWT (con bloqueo) | Todos |
+| POST | `/auth/cambiar-password` | Cambio de contrasena | Todos |
+| GET/POST | `/usuarios/` | Listado y alta de usuarios | Gerencia |
+| POST | `/usuarios/{id}/desactivar` · `/activar` · `/forzar-cambio` | Gestion de cuentas | Gerencia |
+| GET | `/seguridad/auditoria` | Log de auditoria | Gerencia |
+| GET/POST | `/seguridad/backups` · `/backups/verificar` | Copias y prueba de restauracion | Gerencia |
+| GET | `/comercial/oportunidades` | Pipeline comercial | Gerencia, Administracion |
 | POST | `/asistente/consulta` | Consulta al motor RAG | Segun permisos |
 | GET | `/alquileres/contratos` | Contratos activos | Gerencia, Administracion |
 | GET | `/alquileres/mora` | Contratos en mora | Gerencia, Administracion |
@@ -187,6 +248,7 @@ rg_asistente/
 | Verificacion de vencimientos | 08:00 | Detecta contratos por vencer (30 y 7 dias) |
 | Verificacion de mora | 08:30 | Detecta mora a partir de 5 dias de retraso |
 | Verificacion de desvios de obra | 09:00 | Detecta etapas de obra demoradas |
+| Copia de seguridad | 00:00 | pg_dump de la base, retencion de 7 dias |
 
 ---
 

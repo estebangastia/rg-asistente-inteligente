@@ -10,6 +10,7 @@ Jobs definidos:
   - verificar_vencimientos(): ejecuta diariamente a las 08:00
   - verificar_mora():         ejecuta diariamente a las 08:30
   - verificar_desvios_obra(): ejecuta diariamente a las 09:00
+  - job_backup_diario():      ejecuta diariamente a las 00:00 (app/respaldo.py)
 """
 import smtplib
 import logging
@@ -22,6 +23,10 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import Contrato, Inquilino, Obra, EtapaObra, Notificacion
 from app.config import get_settings
+
+# Zona horaria explícita: evita depender de la configuración del sistema
+# operativo (en Windows requiere el paquete tzdata, incluido en requirements).
+TZ = "America/Argentina/Buenos_Aires"
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -41,7 +46,7 @@ def _enviar_email(destinatario: str, asunto: str, cuerpo: str) -> bool:
         msg["To"] = destinatario
         msg.attach(MIMEText(cuerpo, "html"))
 
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
             server.starttls()
             server.login(settings.smtp_user, settings.smtp_password)
             server.sendmail(settings.email_from, destinatario, msg.as_string())
@@ -288,14 +293,15 @@ def verificar_desvios_obra() -> None:
 
 def crear_scheduler() -> BackgroundScheduler:
     """
-    Crea y configura el scheduler de APScheduler con los tres jobs diarios.
+    Crea y configura el scheduler de APScheduler con los jobs diarios
+    (vencimientos, mora, desvíos de obra y copia de seguridad).
     Se inicia junto con la aplicación FastAPI en el evento startup.
     """
-    scheduler = BackgroundScheduler(timezone="America/Argentina/Cordoba")
+    scheduler = BackgroundScheduler(timezone=TZ)
 
     scheduler.add_job(
         verificar_vencimientos,
-        trigger=CronTrigger(hour=8, minute=0),
+        trigger=CronTrigger(hour=8, minute=0, timezone=TZ),
         id="verificar_vencimientos",
         name="Verificación diaria de vencimientos de contratos",
         replace_existing=True,
@@ -304,7 +310,7 @@ def crear_scheduler() -> BackgroundScheduler:
 
     scheduler.add_job(
         verificar_mora,
-        trigger=CronTrigger(hour=8, minute=30),
+        trigger=CronTrigger(hour=8, minute=30, timezone=TZ),
         id="verificar_mora",
         name="Verificación diaria de mora en alquileres",
         replace_existing=True,
@@ -313,9 +319,19 @@ def crear_scheduler() -> BackgroundScheduler:
 
     scheduler.add_job(
         verificar_desvios_obra,
-        trigger=CronTrigger(hour=9, minute=0),
+        trigger=CronTrigger(hour=9, minute=0, timezone=TZ),
         id="verificar_desvios_obra",
         name="Verificación diaria de desvíos de cronograma de obra",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    from app.respaldo import job_backup_diario
+    scheduler.add_job(
+        job_backup_diario,
+        trigger=CronTrigger(hour=0, minute=0, timezone=TZ),
+        id="backup_diario",
+        name="Copia de seguridad diaria de PostgreSQL",
         replace_existing=True,
         misfire_grace_time=3600,
     )

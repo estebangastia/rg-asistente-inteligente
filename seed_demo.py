@@ -7,21 +7,42 @@ Crea datos realistas para demostrar el funcionamiento del sistema:
   - 5 inquilinos con contratos en distintos estados
   - 2 obras activas con etapas
   - 3 clientes en pipeline comercial
+
+Uso:
+    python seed_demo.py              → carga los datos solo si la base está vacía
+    python seed_demo.py --reiniciar  → borra todo y vuelve a cargar los datos de demo
 """
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date, timedelta
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal, init_db, engine
 from app.models import (
     Usuario, Inquilino, Inmueble, Contrato,
     Obra, EtapaObra, ClientePotencial, Oportunidad
 )
+from app.models import Base
 from app.auth import hash_password
+from app.seguridad import ahora
 
 
-def seed():
+def _base_con_datos() -> bool:
+    from sqlalchemy import inspect, text
+    if not inspect(engine).has_table("usuarios"):
+        return False
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT COUNT(*) FROM usuarios")).scalar() > 0
+
+
+def seed(reiniciar: bool = False):
+    # Si la base ya tiene datos no se toca (así los scripts de arranque se
+    # pueden ejecutar siempre). Con --reiniciar se borra todo y se recrea.
+    if _base_con_datos() and not reiniciar:
+        init_db()  # aplica migraciones pendientes (columnas de seguridad)
+        print("La base ya tiene datos: se conservan. Para volver a los datos de demo: python seed_demo.py --reiniciar")
+        return
+    Base.metadata.drop_all(bind=engine)
     init_db()
     db = SessionLocal()
 
@@ -30,22 +51,25 @@ def seed():
     # ── USUARIOS ──────────────────────────────────────────────────
     usuarios = [
         Usuario(
-            nombre="Pablo Virgolini",
+            nombre="Ricardo Gómez",
             email="gerencia@rg-sa.com.ar",
             password_hash=hash_password("Rg2026!gerencia"),
             rol="gerencia",
+            password_actualizada=ahora(),
         ),
         Usuario(
             nombre="Ana Martínez",
             email="admin@rg-sa.com.ar",
             password_hash=hash_password("Rg2026!admin"),
             rol="administracion",
+            password_actualizada=ahora(),
         ),
         Usuario(
             nombre="Luis Rodríguez",
             email="obras@rg-sa.com.ar",
             password_hash=hash_password("Rg2026!obras"),
             rol="jefe_obra",
+            password_actualizada=ahora(),
         ),
     ]
     for u in usuarios:
@@ -196,4 +220,4 @@ def seed():
 
 
 if __name__ == "__main__":
-    seed()
+    seed(reiniciar="--reiniciar" in sys.argv)
