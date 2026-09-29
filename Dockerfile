@@ -27,5 +27,8 @@ COPY . .
 # Exponer el puerto de la API
 EXPOSE 8000
 
-# Cargar datos de demo (solo si la base está vacía) y levantar el servidor
-CMD ["sh", "-c", "python seed_demo.py && uvicorn main:app --host 0.0.0.0 --port 8000"]
+# Cargar datos de demo (solo si la base está vacía) y levantar el servidor.
+# --proxy-headers: en la nube el pedido llega a través del proxy de la plataforma;
+# así uvicorn toma la IP real del usuario de la cabecera X-Forwarded-For
+# (la que queda registrada en el log de auditoría) en lugar de la del proxy.
+CMD ["sh", "-c", "python seed_demo.py && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]

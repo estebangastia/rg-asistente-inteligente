@@ -280,7 +280,7 @@
         </div>
         <div class="panel-box">
           <h3>Log de auditoría (últimos 100 eventos)</h3>
-          <table class="compact"><thead><tr><th>Fecha (UTC)</th><th>Usuario</th><th>Evento</th><th>Detalle</th><th>IP</th></tr></thead><tbody id="tabla-auditoria"></tbody></table>
+          <table class="compact"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Evento</th><th>Detalle</th><th>IP</th></tr></thead><tbody id="tabla-auditoria"></tbody></table>
         </div>
       </div>
     </div>
@@ -325,7 +325,13 @@ function fill(email, pass) {
   document.getElementById('password').value = pass;
 }
 
+let ingresando = false;
 async function login() {
+  if (ingresando) return;   // evita el doble envío (doble clic o Enter + clic)
+  ingresando = true;
+  try { await loginInterno(); } finally { ingresando = false; }
+}
+async function loginInterno() {
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
   const errorEl = document.getElementById('login-error');
@@ -583,7 +589,7 @@ async function loadSeguridad() {
     loadBackups();
     const ev = await apiGet('/seguridad/auditoria?limite=100');
     document.getElementById('tabla-auditoria').innerHTML = ev.map(e => `
-      <tr><td>${e.fecha ? e.fecha.replace('T', ' ').slice(0, 19) : ''}</td><td>${escapeHtml(e.email || '')}</td>
+      <tr><td>${horaLocal(e.fecha)}</td><td>${escapeHtml(e.email || '')}</td>
       <td class="evento">${escapeHtml(e.evento)}</td><td>${escapeHtml(e.detalle || '')}</td><td>${escapeHtml(e.ip || '')}</td></tr>`).join('');
   } catch (e) { console.error(e); }
 }
@@ -616,6 +622,14 @@ async function verificarBackup() {
 }
 
 // Helpers
+// La base guarda las fechas en UTC (práctica estándar en servidores);
+// en pantalla se muestran en la hora de Argentina.
+function horaLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso.slice(0, 19) + 'Z');
+  return d.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
 function rolLabel(r) {
   return { gerencia: 'Gerencia', administracion: 'Administración', jefe_obra: 'Jefe de obra' }[r] || r;
 }
