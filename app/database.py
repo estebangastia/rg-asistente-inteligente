@@ -74,6 +74,9 @@ def _migrar_columnas_seguridad():
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS password_actualizada TIMESTAMP DEFAULT now()",
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_acceso TIMESTAMP NULL",
+        # Notificaciones: también registran avisos de obra (sin contrato) y su asunto
+        "ALTER TABLE notificaciones ALTER COLUMN id_contrato DROP NOT NULL",
+        "ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS asunto VARCHAR(200)",
     ]
     with engine.begin() as conn:
         for sql in sentencias:

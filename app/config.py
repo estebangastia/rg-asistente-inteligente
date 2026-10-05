@@ -37,7 +37,14 @@ class Settings(BaseSettings):
     backup_retencion_dias: int = 7
     pg_bin_dir: str = ""         # carpeta de pg_dump/pg_restore si no están en el PATH
 
-    # Email SMTP
+    # Email por API HTTPS (funcionan donde SMTP está bloqueado, como en Railway)
+    resend_api_key: str = ""
+    resend_from: str = ""            # vacío = onboarding@resend.dev (sin dominio propio)
+    sendgrid_api_key: str = ""
+    email_notificaciones: str = ""   # casilla que recibe los avisos internos
+    email_altas: bool = False        # enviar la contraseña inicial por email (producción)
+
+    # Email SMTP (alternativa para servidores propios)
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""

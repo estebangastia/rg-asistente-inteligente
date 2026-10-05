@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date, timedelta
 from app.database import SessionLocal, init_db, engine
 from app.models import (
-    Usuario, Inquilino, Inmueble, Contrato,
+    Usuario, Inquilino, Inmueble, Contrato, Pago,
     Obra, EtapaObra, ClientePotencial, Oportunidad
 )
 from app.models import Base
@@ -138,7 +138,7 @@ def seed(reiniciar: bool = False):
         Contrato(
             id_inquilino=inquilinos[4].id_inquilino,
             id_inmueble=inmuebles[4].id_inmueble,
-            fecha_inicio=hoy - timedelta(days=30),
+            fecha_inicio=(hoy.replace(day=1) - timedelta(days=60)).replace(day=1),  # vence el día 1 de cada mes
             fecha_vencimiento=hoy + timedelta(days=150),
             monto_mensual=220000,
             estado="al_dia",
@@ -147,7 +147,27 @@ def seed(reiniciar: bool = False):
     for c in contratos:
         db.add(c)
     db.commit()
-    print("  ✅ Inquilinos, inmuebles y contratos creados")
+
+    # Pagos: los contratos al día tienen pagado el mes actual y los anteriores.
+    # Pérez (último contrato) tiene pagados los meses anteriores pero NO el actual:
+    # al ejecutar el control de mora (pasados 5 días de su vencimiento mensual,
+    # el día 1) el sistema lo detecta y pasa a "en mora".
+    def periodo(meses_atras):
+        anio, mes = hoy.year, hoy.month - meses_atras
+        while mes <= 0:
+            mes += 12
+            anio -= 1
+        return f"{anio}-{mes:02d}"
+
+    for c, meses in [(contratos[1], 3), (contratos[2], 5), (contratos[3], 2)]:
+        for m in range(meses):
+            db.add(Pago(id_contrato=c.id_contrato, fecha_pago=hoy - timedelta(days=30 * m),
+                        monto=c.monto_mensual, periodo=periodo(m), medio_pago="Transferencia"))
+    for m in (1, 2):
+        db.add(Pago(id_contrato=contratos[4].id_contrato, fecha_pago=hoy - timedelta(days=30 * m),
+                    monto=contratos[4].monto_mensual, periodo=periodo(m), medio_pago="Transferencia"))
+    db.commit()
+    print("  ✅ Inquilinos, inmuebles, contratos y pagos creados")
 
     # ── OBRAS ─────────────────────────────────────────────────────
     obras = [

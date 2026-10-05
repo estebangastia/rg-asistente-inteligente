@@ -102,8 +102,9 @@ class Notificacion(Base):
     __tablename__ = "notificaciones"
 
     id_notificacion = Column(Integer, primary_key=True, autoincrement=True)
-    id_contrato = Column(Integer, ForeignKey("contratos.id_contrato"), nullable=False)
+    id_contrato = Column(Integer, ForeignKey("contratos.id_contrato"), nullable=True)  # vacío en avisos de obra
     tipo = Column(String(50))
+    asunto = Column(String(200))
     destinatario = Column(String(150))
     fecha_envio = Column(DateTime, server_default=func.now())
     estado_envio = Column(String(20), default="pendiente")

@@ -14,9 +14,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.routers import (
     auth_router, asistente_router, alquileres_router, obras_router,
-    comercial_router, panel_router, usuarios_router, seguridad_router
+    comercial_router, panel_router, usuarios_router, seguridad_router,
+    automatizacion_router
 )
 from app.rag_engine import descripcion_motor
+from app.notificador import canal_configurado
 from app.config import get_settings
 from app.database import init_db
 from jobs.scheduler import crear_scheduler
@@ -102,6 +104,7 @@ app.include_router(comercial_router)
 app.include_router(panel_router)
 app.include_router(usuarios_router)
 app.include_router(seguridad_router)
+app.include_router(automatizacion_router)
 
 
 @app.get("/api/health", tags=["Health"])
@@ -112,6 +115,7 @@ def health_check():
         "estado": "operativo",
         "version": "1.1.0",
         "motor_ia": descripcion_motor(),
+        "email": canal_configurado(),
         "jobs_activos": [job.name for job in scheduler.get_jobs()],
     }
 

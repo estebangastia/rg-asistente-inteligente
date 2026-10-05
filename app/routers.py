@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Usuario, Contrato, Inquilino, Obra, EtapaObra,
-    Oportunidad, ClientePotencial, LogAuditoria
+    Oportunidad, ClientePotencial, LogAuditoria, Notificacion
 )
 from app.auth import (
     hash_password, verify_password, create_access_token,
@@ -257,23 +257,26 @@ def alta_usuario(
     db.commit()
     db.refresh(nuevo)
 
+    # En producción la contraseña inicial viaja por email (EMAIL_ALTAS=true).
+    # En la demo los correos de los usuarios son ficticios: se muestra una vez en pantalla.
     enviado = False
-    if settings.smtp_user and settings.smtp_password:
-        from jobs.scheduler import _enviar_email
-        enviado = _enviar_email(
+    if settings.email_altas:
+        from app.notificador import enviar_email
+        estado, _ = enviar_email(
             email, "Alta en el Sistema de Asistencia Inteligente — RG S.A.",
             f"<p>Hola {nuevo.nombre}, se creó tu usuario con rol <b>{nuevo.rol}</b>.</p>"
             f"<p>Contraseña inicial: <b>{password_inicial}</b></p>"
             f"<p>Deberás cambiarla en tu primer ingreso.</p>",
         )
+        enviado = estado == "enviado"
     auditar(db, "alta_usuario", gerente.email,
-            f"Alta de {email} con rol {datos.rol} (correo {'enviado' if enviado else 'no enviado: SMTP sin configurar'})",
+            f"Alta de {email} con rol {datos.rol} (contraseña inicial {'enviada por email' if enviado else 'mostrada en pantalla'})",
             _ip(request))
 
     respuesta = {"usuario": _usuario_dict(nuevo), "correo_enviado": enviado}
     if not enviado:
         respuesta["password_inicial"] = password_inicial
-        respuesta["aviso"] = ("Modo demo: SMTP no configurado. Comunique esta contraseña al usuario; "
+        respuesta["aviso"] = ("Modo demo: comunique esta contraseña al usuario; "
                               "no se volverá a mostrar.")
     return respuesta
 
@@ -503,6 +506,68 @@ def listar_obras(
             ],
         })
     return resultado
+
+
+# ── ROUTER AUTOMATIZACIÓN (solo Gerencia) ────────────────────────────────────
+
+automatizacion_router = APIRouter(prefix="/automatizacion", tags=["Automatización"])
+
+
+@automatizacion_router.get("/estado")
+def estado_automatizacion(_: Usuario = Depends(require_gerencia)):
+    """Canal de email activo, casilla de destino y horario de cada job."""
+    from app.notificador import canal_configurado, destinatario_avisos
+    return {
+        "canal_email": canal_configurado(),
+        "destinatario": destinatario_avisos() or None,
+        "jobs": [
+            {"id": "vencimientos", "nombre": "Vencimientos de contratos", "hora": "08:00"},
+            {"id": "mora", "nombre": "Mora en alquileres", "hora": "08:30"},
+            {"id": "desvios", "nombre": "Desvíos de cronograma de obra", "hora": "09:00"},
+        ],
+    }
+
+
+@automatizacion_router.post("/ejecutar/{job}")
+def ejecutar_job(job: str, request: Request, db: Session = Depends(get_db),
+                 gerente: Usuario = Depends(require_gerencia)):
+    """
+    Ejecuta en el momento uno de los jobs diarios (los mismos que corre el
+    scheduler), para verificar la automatización sin esperar al horario.
+    """
+    from jobs.scheduler import JOBS_MANUALES
+    funcion = JOBS_MANUALES.get(job)
+    if funcion is None:
+        raise HTTPException(status_code=404, detail=f"Job inexistente. Opciones: {', '.join(JOBS_MANUALES)}")
+    resultado = funcion()
+    auditar(db, "job_manual", gerente.email, f"{job}: {resultado}", _ip(request))
+    return resultado
+
+
+@automatizacion_router.post("/prueba-email")
+def prueba_email(request: Request, db: Session = Depends(get_db), gerente: Usuario = Depends(require_gerencia)):
+    """Envía un email de prueba a la casilla de avisos para verificar la configuración."""
+    from app.notificador import enviar_email, destinatario_avisos, canal_configurado
+    destino = destinatario_avisos()
+    estado, detalle = enviar_email(
+        destino, "Prueba de envío — Sistema de Asistencia Inteligente RG S.A.",
+        "<h3>Email de prueba</h3><p>Si recibís este mensaje, los avisos automáticos están funcionando.</p>"
+        f"<p>Canal: {canal_configurado()}</p>",
+    )
+    auditar(db, "prueba_email", gerente.email, f"{estado}: {detalle}"[:400], _ip(request))
+    return {"estado": estado, "detalle": detalle, "destinatario": destino or None}
+
+
+@automatizacion_router.get("/notificaciones")
+def ver_notificaciones(limite: int = 50, db: Session = Depends(get_db), _: Usuario = Depends(require_gerencia)):
+    """Últimos avisos generados por los jobs (tabla NOTIFICACION)."""
+    limite = max(1, min(limite, 200))
+    filas = db.query(Notificacion).order_by(Notificacion.id_notificacion.desc()).limit(limite).all()
+    return [
+        {"fecha": n.fecha_envio.isoformat() if n.fecha_envio else None, "tipo": n.tipo,
+         "asunto": n.asunto, "destinatario": n.destinatario, "estado": n.estado_envio}
+        for n in filas
+    ]
 
 
 # ── ROUTER COMERCIAL ──────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ Duración estimada: 6–7 minutos. Cubre lo que pidió el CAE: prototipo funcion
    - `"estado": "operativo"`
    - `"motor_ia": "groq · openai/gpt-oss-120b"` (si se configuró la key)
    - 4 jobs activos
-4. `pytest -q` → 49 tests en verde (sirve como evidencia si preguntan por calidad).
+4. `pytest -q` → 59 tests en verde (sirve como evidencia si preguntan por calidad).
 5. Tener abierta una segunda pestaña con `http://localhost:8000/docs` (Swagger).
 6. Plan B: si no hay internet, el asistente responde igual con el motor de reglas y
    lo indica debajo de cada respuesta. Contarlo como decisión de diseño.
@@ -40,6 +40,15 @@ Duración estimada: 6–7 minutos. Cubre lo que pidió el CAE: prototipo funcion
 1. Cerrar sesión, ingresar como Jefe de obra: el menú solo muestra Obras y Asistente.
 2. Preguntar al asistente "¿Cuántos contratos están en mora?" → responde que su perfil
    no tiene acceso. **El modelo nunca recibe los datos de alquileres de este usuario.**
+
+## 3b. Automatización (1–2 min) — usuario **Gerencia**
+
+1. **Automatización** → mostrar el canal de email (Resend) y los horarios de los jobs.
+2. "Ejecutar control de vencimientos" → detecta el contrato de López (vence en 5 días)
+   y **llega el email al celular** en vivo.
+3. "Ejecutar control de obras" → detecta las etapas demoradas y avisa.
+4. La tabla de avisos muestra cada notificación con su estado (tabla NOTIFICACION).
+   Es el objetivo específico 4 funcionando: detecta eventos y avisa sin intervención.
 
 ## 4. Seguridad (2–3 min) — usuario **Gerencia**
 

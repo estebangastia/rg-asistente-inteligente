@@ -119,6 +119,23 @@ vuelve automaticamente al motor de reglas: la demo nunca queda sin respuesta.
 
 ---
 
+## Avisos por email
+
+Los jobs mandan los avisos por **Resend** o **SendGrid** (API HTTPS) y los registran en la tabla
+`notificaciones`. Configurar en `.env` (o en las variables de Railway):
+
+```
+RESEND_API_KEY=re_...      # o SENDGRID_API_KEY=SG....
+EMAIL_FROM=remitente_verificado@...
+EMAIL_NOTIFICACIONES=casilla_de_avisos@...
+```
+
+Sin ninguna key (ni SMTP) los avisos se registran como **simulados**: la demo
+funciona igual. Desde la interfaz, Gerencia → **Automatizacion** permite ejecutar
+cada job en el momento, enviar un email de prueba y ver los avisos generados.
+
+---
+
 ## Seguridad implementada
 
 | Control | Implementacion |
@@ -153,7 +170,7 @@ solos en `C:\Program Files\PostgreSQL\<version>\bin`; si no, configurar `PG_BIN_
 
 ## Tests automatizados
 
-El proyecto incluye 49 tests: autenticacion, endpoints de cada modulo, motor RAG,
+El proyecto incluye 59 tests: autenticacion, endpoints de cada modulo, motor RAG,
 control de acceso por rol, controles de seguridad y respaldo.
 
 ```bash
@@ -200,6 +217,7 @@ rg_asistente/
 |-- backup.py                   # Copia de seguridad y prueba de restauracion
 |-- test_sistema.py             # Tests de modulos, asistente y roles
 |-- test_seguridad.py           # Tests de seguridad, asistente y respaldo
+|-- test_automatizacion.py      # Tests de jobs, notificaciones y envio de email
 |-- GUIA_DEMO.md                # Guion para la demostracion en vivo
 |-- .env.example                # Plantilla de variables de entorno
 |-- README.md
@@ -212,6 +230,7 @@ rg_asistente/
 |   |-- auth.py                 # JWT + bcrypt + control de acceso por rol
 |   |-- seguridad.py            # Bloqueo, politica de contrasenas, historial, auditoria
 |   |-- respaldo.py             # pg_dump, retencion y prueba de restauracion
+|   |-- notificador.py          # Envio de email: SendGrid (API), SMTP o simulado
 |   |-- rag_engine.py           # Motor RAG activo (LangChain + LLM, con respaldo por reglas)
 |   |-- rag_engine_openai.py    # Variante con busqueda semantica pgvector (referencia)
 |   `-- routers.py              # Endpoints de la API
@@ -232,6 +251,8 @@ rg_asistente/
 | GET | `/seguridad/auditoria` | Log de auditoria | Gerencia |
 | GET/POST | `/seguridad/backups` · `/backups/verificar` | Copias y prueba de restauracion | Gerencia |
 | GET | `/comercial/oportunidades` | Pipeline comercial | Gerencia, Administracion |
+| POST | `/automatizacion/ejecutar/{job}` | Ejecuta vencimientos, mora o desvios en el momento | Gerencia |
+| GET | `/automatizacion/notificaciones` | Avisos generados por los jobs | Gerencia |
 | POST | `/asistente/consulta` | Consulta al motor RAG | Segun permisos |
 | GET | `/alquileres/contratos` | Contratos activos | Gerencia, Administracion |
 | GET | `/alquileres/mora` | Contratos en mora | Gerencia, Administracion |

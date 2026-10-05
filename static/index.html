@@ -250,6 +250,26 @@
         <table><thead><tr><th>Cliente</th><th>Etapa</th><th>Operación</th><th>Origen</th><th>Sin contacto</th></tr></thead>
         <tbody id="tabla-comercial"></tbody></table>
       </div>
+      <!-- AUTOMATIZACIÓN -->
+      <div id="view-automatizacion" class="view hidden">
+        <h2 class="section-title">Automatización de avisos</h2>
+        <div class="panel-box">
+          <h3>Jobs diarios</h3>
+          <div class="pol-grid" id="auto-estado"></div>
+          <div style="margin-top:14px">
+            <button class="btn-sm" onclick="ejecutarJob('vencimientos')">Ejecutar control de vencimientos</button>
+            <button class="btn-sm" onclick="ejecutarJob('mora')">Ejecutar control de mora</button>
+            <button class="btn-sm" onclick="ejecutarJob('desvios')">Ejecutar control de obras</button>
+            <button class="btn-sm" onclick="pruebaEmail()">Enviar email de prueba</button>
+          </div>
+          <div class="notice" id="auto-msg"></div>
+        </div>
+        <div class="panel-box">
+          <h3>Avisos generados (tabla NOTIFICACION)</h3>
+          <table class="compact"><thead><tr><th>Fecha y hora</th><th>Tipo</th><th>Asunto</th><th>Destinatario</th><th>Estado</th></tr></thead>
+          <tbody id="tabla-notificaciones"></tbody></table>
+        </div>
+      </div>
       <!-- USUARIOS -->
       <div id="view-usuarios" class="view hidden">
         <h2 class="section-title">Administración de usuarios</h2>
@@ -316,6 +336,7 @@ const MODULOS = {
   obras:      { label: "Obras", roles: ["gerencia", "jefe_obra"] },
   comercial:  { label: "Comercial", roles: ["gerencia", "administracion"] },
   asistente:  { label: "Asistente IA", roles: ["gerencia", "administracion", "jefe_obra"] },
+  automatizacion: { label: "Automatización", roles: ["gerencia"] },
   usuarios:   { label: "Usuarios", roles: ["gerencia"] },
   seguridad:  { label: "Seguridad", roles: ["gerencia"] },
 };
@@ -396,6 +417,7 @@ function showView(key) {
   if (key === 'obras') loadObras();
   if (key === 'comercial') loadComercial();
   if (key === 'usuarios') loadUsuarios();
+  if (key === 'automatizacion') loadAutomatizacion();
   if (key === 'seguridad') loadSeguridad();
 }
 
@@ -532,6 +554,44 @@ async function loadComercial() {
       <tr><td>${escapeHtml(o.cliente)}</td><td>${escapeHtml(etapaLabel(o.etapa))}</td><td>${escapeHtml(o.tipo_operacion || '')}</td>
       <td>${escapeHtml(o.origen || '')}</td><td>${o.dias_sin_contacto ?? '—'} días</td></tr>`).join('');
   } catch (e) { console.error(e); }
+}
+
+// ── Automatización ──
+const ESTADO_AVISO = { enviado: 'no', fallido: 'si', simulado: 'por_vencer' };
+async function loadAutomatizacion() {
+  try {
+    const e = await apiGet('/automatizacion/estado');
+    const filas = [['Canal de email', e.canal_email], ['Casilla de avisos', e.destinatario || 'sin configurar'],
+      ...e.jobs.map(j => [j.nombre, 'todos los días a las ' + j.hora])];
+    document.getElementById('auto-estado').innerHTML = filas.map(([a, b]) => `<div>${escapeHtml(a)}</div><div>${escapeHtml(b)}</div>`).join('');
+    const ns = await apiGet('/automatizacion/notificaciones');
+    document.getElementById('tabla-notificaciones').innerHTML = ns.length ? ns.map(n => `
+      <tr><td>${horaLocal(n.fecha)}</td><td class="evento">${escapeHtml(n.tipo || '')}</td><td>${escapeHtml(n.asunto || '')}</td>
+      <td>${escapeHtml(n.destinatario || '')}</td><td><span class="badge ${ESTADO_AVISO[n.estado] || ''}">${escapeHtml(n.estado || '')}</span></td></tr>`).join('')
+      : '<tr><td colspan="5">Todavía no se generaron avisos.</td></tr>';
+  } catch (e) { console.error(e); }
+}
+async function ejecutarJob(job) {
+  const msg = document.getElementById('auto-msg');
+  msg.className = 'notice ok'; msg.textContent = 'Ejecutando...';
+  try {
+    const r = await api(`/automatizacion/ejecutar/${job}`, 'POST');
+    if (r.error) throw { detail: r.error };
+    msg.innerHTML = `<b>${escapeHtml(r.job)}</b>: ${r.detectados} caso(s) detectado(s) · ${r.enviados} email(s) enviado(s)` +
+      (r.simulados ? ` · ${r.simulados} simulado(s)` : '') + (r.fallidos ? ` · ${r.fallidos} fallido(s)` : '');
+    if (r.fallidos) msg.className = 'notice err';
+    loadAutomatizacion();
+  } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error al ejecutar el job.'; }
+}
+async function pruebaEmail() {
+  const msg = document.getElementById('auto-msg');
+  msg.className = 'notice ok'; msg.textContent = 'Enviando...';
+  try {
+    const r = await api('/automatizacion/prueba-email', 'POST');
+    msg.className = r.estado === 'fallido' ? 'notice err' : 'notice ok';
+    msg.textContent = r.estado === 'enviado' ? `Email de prueba enviado a ${r.destinatario}. Revisá la bandeja (y spam).`
+      : `${r.estado}: ${r.detalle}`;
+  } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error al enviar.'; }
 }
 
 // ── Usuarios ──
