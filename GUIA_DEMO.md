@@ -5,7 +5,10 @@ Duración estimada: 6–7 minutos. Cubre lo que pidió el CAE: prototipo funcion
 
 ## Antes de la defensa (el día anterior)
 
-1. `python seed_demo.py --reiniciar` → datos de demo limpios.
+1. Datos de demo limpios: en la nube, entrar como Gerencia → **Automatización** →
+   **Reiniciar datos de demo** (dos clics: el botón pide confirmación). En local,
+   `python seed_demo.py --reiniciar`. Las fechas quedan relativas al día del reinicio,
+   así el contrato de López vence en 5 días y las obras aparecen demoradas.
 2. Levantar el sistema (`iniciar_windows.bat` o `uvicorn main:app --port 8000`).
 3. Abrir `http://localhost:8000/api/health` y confirmar:
    - `"estado": "operativo"`

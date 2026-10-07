@@ -130,3 +130,9 @@ class TestJobsManuales:
     def test_estado_muestra_canal(self):
         r = client.get("/automatizacion/estado", headers=auth(*GER)).json()
         assert "canal_email" in r and len(r["jobs"]) == 3
+
+
+def test_reiniciar_demo_solo_gerencia():
+    """El reinicio de los datos de demostración está restringido a Gerencia."""
+    r = client.post("/automatizacion/reiniciar-demo", headers=auth(*ADM))
+    assert r.status_code == 403

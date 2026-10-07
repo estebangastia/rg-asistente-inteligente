@@ -558,6 +558,30 @@ def prueba_email(request: Request, db: Session = Depends(get_db), gerente: Usuar
     return {"estado": estado, "detalle": detalle, "destinatario": destino or None}
 
 
+@automatizacion_router.post("/reiniciar-demo")
+def reiniciar_demo(request: Request, db: Session = Depends(get_db), gerente: Usuario = Depends(require_gerencia)):
+    """
+    Vuelve la base a los datos de demostración iniciales (los mismos de
+    seed_demo.py --reiniciar), con fechas relativas al día de hoy. Solo Gerencia.
+    Pensado para dejar el sistema en condiciones antes de una demostración;
+    borra también el log de auditoría y los avisos anteriores.
+    """
+    import subprocess, sys, os
+    email = gerente.email
+    db.close()  # libera la conexión: el reinicio necesita bloqueo exclusivo de las tablas
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    proc = subprocess.run([sys.executable, "seed_demo.py", "--reiniciar"], cwd=raiz,
+                          capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"No se pudieron reiniciar los datos: {proc.stderr[-300:]}")
+    db2 = next(get_db())
+    try:
+        auditar(db2, "reinicio_demo", email, "Datos de demostración reiniciados (fechas relativas a hoy)", _ip(request))
+    finally:
+        db2.close()
+    return {"estado": "ok", "detalle": "Datos de demostración reiniciados. Las sesiones abiertas siguen siendo válidas."}
+
+
 @automatizacion_router.get("/notificaciones")
 def ver_notificaciones(limite: int = 50, db: Session = Depends(get_db), _: Usuario = Depends(require_gerencia)):
     """Últimos avisos generados por los jobs (tabla NOTIFICACION)."""

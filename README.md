@@ -79,6 +79,7 @@ cp .env.example .env              # ajustar DATABASE_URL con los datos de Postgr
 # 5. Inicializar tablas + datos de demo (solo si la base esta vacia)
 python seed_demo.py
 #    Para volver a los datos de demo originales: python seed_demo.py --reiniciar
+#    (en un despliegue en la nube: botón "Reiniciar datos de demo" en Automatización, solo Gerencia)
 
 # 6. Levantar
 uvicorn main:app --reload --port 8000

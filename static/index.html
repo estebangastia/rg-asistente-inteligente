@@ -261,6 +261,7 @@
             <button class="btn-sm" onclick="ejecutarJob('mora')">Ejecutar control de mora</button>
             <button class="btn-sm" onclick="ejecutarJob('desvios')">Ejecutar control de obras</button>
             <button class="btn-sm" onclick="pruebaEmail()">Enviar email de prueba</button>
+            <button class="btn-sm" id="btn-reiniciar" onclick="reiniciarDemo()" style="float:right;background:#fff;color:#b45309;border:1px solid #f59e0b">Reiniciar datos de demo</button>
           </div>
           <div class="notice" id="auto-msg"></div>
         </div>
@@ -593,6 +594,24 @@ async function pruebaEmail() {
     msg.textContent = r.estado === 'enviado' ? `Email de prueba enviado a ${r.destinatario}. Revisá la bandeja (y spam).`
       : `${r.estado}: ${r.detalle}`;
   } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error al enviar.'; }
+}
+
+async function reiniciarDemo() {
+  const btn = document.getElementById('btn-reiniciar');
+  const msg = document.getElementById('auto-msg');
+  if (btn.dataset.confirmar !== '1') {
+    btn.dataset.confirmar = '1'; btn.textContent = 'Confirmar reinicio (borra todo)';
+    setTimeout(() => { btn.dataset.confirmar = ''; btn.textContent = 'Reiniciar datos de demo'; }, 6000);
+    return;
+  }
+  btn.dataset.confirmar = ''; btn.textContent = 'Reiniciando...'; btn.disabled = true;
+  msg.className = 'notice ok'; msg.textContent = 'Reiniciando los datos de demostración...';
+  try {
+    const r = await api('/automatizacion/reiniciar-demo', 'POST');
+    msg.textContent = r.detalle;
+    loadAutomatizacion();
+  } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'No se pudieron reiniciar los datos.'; }
+  btn.disabled = false; btn.textContent = 'Reiniciar datos de demo';
 }
 
 // ── Usuarios ──
