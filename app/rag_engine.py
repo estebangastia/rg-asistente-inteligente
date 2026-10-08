@@ -54,7 +54,9 @@ obras y clientes usando EXCLUSIVAMENTE los datos del CONTEXTO OPERATIVO que se t
 
 Reglas:
 - Respondé en español rioplatense, de forma breve, clara y directa.
-- Usá los datos concretos del contexto: nombres, montos, fechas, días y porcentajes.
+- Usá los datos concretos del contexto: nombres, montos, fechas, días y porcentajes, \
+copiándolos tal como figuran (no recalcules fechas ni días). No confundas el vencimiento del \
+contrato con el vencimiento de la cuota mensual.
 - Si la pregunta se refiere a alquileres, obras o clientes y ese módulo NO figura en \
 MÓDULOS ACCESIBLES, respondé exactamente: "Tu perfil no tiene acceso a la información de \
 <módulo>." (por ejemplo: "Tu perfil no tiene acceso a la información de alquileres."), sin \
@@ -88,14 +90,23 @@ def _contexto_alquileres(db: Session) -> str:
     if not filas:
         return "CONTRATOS DE ALQUILER ACTIVOS: ninguno."
 
-    lineas = [f"CONTRATOS DE ALQUILER ACTIVOS ({len(filas)}):"]
+    lineas = [f"CONTRATOS DE ALQUILER ACTIVOS ({len(filas)}):",
+              "  (la fecha de vencimiento es la del CONTRATO; la cuota mensual vence cada mes el día de inicio del contrato)"]
     for c, inq, inm in filas:
         dias = (c.fecha_vencimiento - hoy).days
         venc = f"en {dias} días" if dias >= 0 else f"vencido hace {-dias} días"
+        mora = ""
+        if c.estado == "en_mora":
+            venc_mes = hoy.replace(day=min(c.fecha_inicio.day, 28)) if c.fecha_inicio else None
+            if venc_mes and venc_mes <= hoy:
+                mora = (f" | MORA: cuota de {hoy.strftime('%m/%Y')} impaga, venció el "
+                        f"{venc_mes.strftime('%d/%m/%Y')} (hace {(hoy - venc_mes).days} días)")
+            else:
+                mora = " | MORA: cuota mensual impaga de un período anterior"
         lineas.append(
             f"  - {inq.apellido}, {inq.nombre} | {inm.direccion} | Estado: {ESTADOS_CONTRATO[c.estado]} | "
-            f"Vence: {c.fecha_vencimiento.strftime('%d/%m/%Y')} ({venc}) | "
-            f"Cuota: {_fmt_monto(c.monto_mensual)} | Tel: {inq.telefono or 's/d'}"
+            f"Contrato vence: {c.fecha_vencimiento.strftime('%d/%m/%Y')} ({venc}) | "
+            f"Cuota mensual: {_fmt_monto(c.monto_mensual)}{mora} | Tel: {inq.telefono or 's/d'}"
         )
     return "\n".join(lineas)
 
@@ -114,7 +125,8 @@ def _contexto_obras(db: Session) -> str:
             .order_by(EtapaObra.fecha_inicio_plan).all()
         )
         avance = sum(float(e.pct_avance) for e in etapas) / len(etapas) if etapas else 0
-        fin = obra.fecha_fin_estimada.strftime('%d/%m/%Y') if obra.fecha_fin_estimada else "s/d"
+        fin = (f"{obra.fecha_fin_estimada.strftime('%d/%m/%Y')} (en {(obra.fecha_fin_estimada - hoy).days} días)"
+               if obra.fecha_fin_estimada else "s/d")
         lineas.append(f"  • {obra.nombre} ({obra.direccion}) | Estado: {obra.estado} | "
                       f"Avance general: {avance:.0f}% | Fin estimado: {fin}")
         for e in etapas:
