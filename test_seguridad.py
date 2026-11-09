@@ -261,3 +261,41 @@ class TestRespaldo:
 
     def test_backup_solo_gerencia(self):
         assert client.post("/seguridad/backups", headers=auth(ADMIN)).status_code == 403
+
+
+# ── ASIGNACIÓN DE CONTRASEÑA POR GERENCIA ─────────────────────────────────────
+
+class TestAsignarPassword:
+
+    def _asignar(self, headers, id_usuario, nueva, exigir=False):
+        return client.post(f"/usuarios/{id_usuario}/asignar-password", headers=headers,
+                           json={"password_nueva": nueva, "exigir_cambio": exigir})
+
+    def test_gerencia_asigna_y_usuario_ingresa_sin_cambio(self, usuario_nuevo):
+        r = self._asignar(auth(GERENCIA), usuario_nuevo["id"], "Facil2026!demo")
+        assert r.status_code == 200, r.text
+        assert r.json()["debe_cambiar_password"] is False
+        login_r = login(usuario_nuevo["email"], "Facil2026!demo")
+        assert login_r.status_code == 200
+        assert login_r.json()["debe_cambiar_password"] is False
+
+    def test_puede_exigir_cambio(self, usuario_nuevo):
+        r = self._asignar(auth(GERENCIA), usuario_nuevo["id"], "Facil2026!demo", exigir=True)
+        assert r.json()["debe_cambiar_password"] is True
+
+    def test_aplica_politica(self, usuario_nuevo):
+        assert self._asignar(auth(GERENCIA), usuario_nuevo["id"], "hola123").status_code == 400
+
+    def test_desbloquea_la_cuenta(self, usuario_nuevo):
+        for _ in range(5):
+            login(usuario_nuevo["email"], "Incorrecta1!")
+        self._asignar(auth(GERENCIA), usuario_nuevo["id"], "Facil2026!demo")
+        assert login(usuario_nuevo["email"], "Facil2026!demo").status_code == 200
+
+    def test_solo_gerencia(self, usuario_nuevo):
+        assert self._asignar(auth(ADMIN), usuario_nuevo["id"], "Facil2026!demo").status_code == 403
+
+    def test_no_sobre_la_propia_cuenta(self):
+        headers = auth(GERENCIA)
+        propio = next(u for u in client.get("/usuarios/", headers=headers).json() if u["email"] == GERENCIA[0])
+        assert self._asignar(headers, propio["id_usuario"], "Facil2026!demo").status_code == 400

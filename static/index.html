@@ -322,6 +322,20 @@
   </div>
 </div>
 
+<!-- ════════ ASIGNAR CONTRASEÑA (Gerencia) ════════ -->
+<div class="modal-bg" id="modal-asignar">
+  <div class="modal">
+    <h2>Asignar contraseña</h2>
+    <p>Usuario: <b id="asig-usuario"></b><br>Mínimo 8 caracteres, con mayúscula, minúscula, número y carácter especial. No puede repetir ninguna de sus últimas 3 contraseñas.</p>
+    <div class="field"><label>Nueva contraseña</label><input type="password" id="asig-nueva" autocomplete="new-password"></div>
+    <div class="field"><label>Repetir nueva contraseña</label><input type="password" id="asig-nueva2" autocomplete="new-password"></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:14px"><input type="checkbox" id="asig-exigir"> Pedirle que la cambie en su próximo ingreso</label>
+    <button class="btn" onclick="guardarAsignacion()">Guardar</button>
+    <div class="error-msg" id="asig-error"></div>
+    <div style="text-align:center;margin-top:8px"><a href="#" onclick="cerrarAsignacion();return false" style="font-size:13px;color:#6b7280">Cancelar</a></div>
+  </div>
+</div>
+
 <script>
 const API = window.location.origin;  // mismo host que sirve la página
 let token = null;
@@ -506,6 +520,13 @@ async function sendMessage() {
 function logout(mensaje) {
   token = null; userRol = null; userEmail = null; userNombre = null;
   cerrarCambioPassword(true);
+  // Lo que vio un usuario no tiene que quedar a la vista del siguiente que ingrese.
+  document.getElementById('chat-messages').innerHTML =
+    '<div class="msg bot">Hola. Soy el asistente de RG S.A. Podés consultarme sobre alquileres, obras o clientes según tu perfil.</div>';
+  document.getElementById('chat-input').value = '';
+  const nuMsg = document.getElementById('nu-msg');
+  nuMsg.className = 'notice'; nuMsg.innerHTML = '';
+  cerrarAsignacion();
   document.getElementById('app-view').style.display = 'none';
   document.getElementById('login-view').style.display = 'flex';
   document.getElementById('password').value = '';
@@ -625,8 +646,37 @@ async function loadUsuarios() {
       <td>${u.debe_cambiar_password ? 'Sí' : 'No'}</td>
       <td>${u.email === userEmail ? '' : `
         ${u.activo && !u.bloqueado ? `<button class="btn-sm danger" onclick="accionUsuario(${u.id_usuario},'desactivar')">Desactivar</button>` : `<button class="btn-sm" onclick="accionUsuario(${u.id_usuario},'activar')">${u.activo ? 'Desbloquear' : 'Activar'}</button>`}
+        <button class="btn-sm" onclick="abrirAsignacion(${u.id_usuario})">Asignar contraseña</button>
         <button class="btn-sm" onclick="accionUsuario(${u.id_usuario},'forzar-cambio')">Forzar cambio de clave</button>`}</td></tr>`).join('');
+    usuariosCargados = us;
   } catch (e) { console.error(e); }
+}
+let usuariosCargados = [];
+let asignandoId = null;
+function abrirAsignacion(id) {
+  const u = usuariosCargados.find(x => x.id_usuario === id);
+  asignandoId = id;
+  document.getElementById('asig-usuario').textContent = u ? `${u.nombre} (${u.email})` : '';
+  ['asig-nueva', 'asig-nueva2'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('asig-exigir').checked = false;
+  document.getElementById('asig-error').textContent = '';
+  document.getElementById('modal-asignar').classList.add('show');
+}
+function cerrarAsignacion() {
+  asignandoId = null;
+  document.getElementById('modal-asignar').classList.remove('show');
+}
+async function guardarAsignacion() {
+  const nueva = document.getElementById('asig-nueva').value;
+  const err = document.getElementById('asig-error');
+  if (nueva !== document.getElementById('asig-nueva2').value) { err.textContent = 'Las contraseñas no coinciden.'; return; }
+  try {
+    await api(`/usuarios/${asignandoId}/asignar-password`, 'POST',
+              { password_nueva: nueva, exigir_cambio: document.getElementById('asig-exigir').checked });
+    cerrarAsignacion();
+    loadUsuarios();
+    alertaFlotante('Contraseña asignada.');
+  } catch (e) { err.textContent = typeof e.detail === 'string' ? e.detail : 'No se pudo asignar la contraseña.'; }
 }
 async function altaUsuario() {
   const msg = document.getElementById('nu-msg');

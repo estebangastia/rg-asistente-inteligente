@@ -68,6 +68,11 @@ class CambioPasswordRequest(BaseModel):
     password_nueva: str
 
 
+class AsignarPasswordRequest(BaseModel):
+    password_nueva: str
+    exigir_cambio: bool = False
+
+
 class AltaUsuarioRequest(BaseModel):
     nombre: str
     email: str
@@ -320,6 +325,44 @@ def forzar_cambio_password(id_usuario: int, request: Request, db: Session = Depe
     u.debe_cambiar_password = True
     db.commit()
     auditar(db, "forzar_cambio", gerente.email, f"Forzó cambio de contraseña de {u.email}", _ip(request))
+    return _usuario_dict(u)
+
+
+@usuarios_router.post("/{id_usuario}/asignar-password")
+def asignar_password(id_usuario: int, datos: AsignarPasswordRequest, request: Request,
+                     db: Session = Depends(get_db), gerente: Usuario = Depends(require_gerencia)):
+    """
+    La Gerencia asigna una contraseña nueva a otro usuario (olvido o reemplazo
+    de la contraseña inicial). Aplica la misma política de complejidad e
+    historial que el cambio normal y desbloquea la cuenta. Para la propia
+    cuenta se usa /auth/cambiar-password, que exige la contraseña actual.
+    """
+    u = db.get(Usuario, id_usuario)
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario inexistente.")
+    if u.id_usuario == gerente.id_usuario:
+        raise HTTPException(status_code=400,
+                            detail="Para su propia cuenta use «Cambiar contraseña» (pide la contraseña actual).")
+
+    errores = validar_politica_password(datos.password_nueva)
+    if errores:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe " + ", ".join(errores) + ".")
+    if password_reutilizada(db, u, datos.password_nueva, verify_password):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No puede reutilizar la contraseña actual ni ninguna de las últimas {settings.passwords_historial}.",
+        )
+
+    guardar_en_historial(db, u)
+    u.password_hash = hash_password(datos.password_nueva)
+    u.password_actualizada = ahora()
+    u.debe_cambiar_password = datos.exigir_cambio
+    u.intentos_fallidos = 0
+    u.bloqueado_hasta = None
+    db.commit()
+    auditar(db, "asignar_password", gerente.email,
+            f"Asignó nueva contraseña a {u.email}" + (" (con cambio obligatorio)" if datos.exigir_cambio else ""),
+            _ip(request))
     return _usuario_dict(u)
 
 
