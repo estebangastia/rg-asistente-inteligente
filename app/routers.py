@@ -613,8 +613,11 @@ def reiniciar_demo(request: Request, db: Session = Depends(get_db), gerente: Usu
     email = gerente.email
     db.close()  # libera la conexión: el reinicio necesita bloqueo exclusivo de las tablas
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # UTF-8 explícito: en Windows la consola usa cp1252 y no puede imprimir los
+    # emojis del script, lo que cortaba el reinicio a mitad de camino.
     proc = subprocess.run([sys.executable, "seed_demo.py", "--reiniciar"], cwd=raiz,
-                          capture_output=True, text=True, timeout=120)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          env={**os.environ, "PYTHONIOENCODING": "utf-8"}, timeout=120)
     if proc.returncode != 0:
         raise HTTPException(status_code=500, detail=f"No se pudieron reiniciar los datos: {proc.stderr[-300:]}")
     db2 = next(get_db())

@@ -14,6 +14,10 @@ Uso:
 """
 import sys
 import os
+# Los mensajes llevan emojis: en Windows la salida puede ser cp1252 y fallar.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date, timedelta
