@@ -150,7 +150,12 @@ def verificar_mora() -> dict:
             <p><strong>Monto adeudado:</strong> ${contrato.monto_mensual:,.0f}</p>
             <p style="color:#888">Sistema de Asistencia Inteligente — RG S.A.</p>"""
             estados.append(_avisar(db, "mora", asunto, cuerpo, contrato.id_contrato))
-        return _resumen("Mora", detectados, estados)
+        r = _resumen("Mora", detectados, estados)
+        # Los que ya estaban en mora no se vuelven a avisar, pero se informan
+        # para que el resultado no parezca "0 contratos en mora".
+        en_mora = db.query(Contrato).filter(Contrato.estado == "en_mora").count()
+        r["ya_en_mora"] = en_mora - detectados
+        return r
     except Exception as e:
         logger.error(f"Error en verificar_mora: {e}")
         db.rollback()

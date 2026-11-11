@@ -600,8 +600,10 @@ async function ejecutarJob(job) {
   try {
     const r = await api(`/automatizacion/ejecutar/${job}`, 'POST');
     if (r.error) throw { detail: r.error };
-    msg.innerHTML = `<b>${escapeHtml(r.job)}</b>: ${r.detectados} caso(s) detectado(s) · ${r.enviados} email(s) enviado(s)` +
-      (r.simulados ? ` · ${r.simulados} simulado(s)` : '') + (r.fallidos ? ` · ${r.fallidos} fallido(s)` : '');
+    const nuevos = r.ya_en_mora !== undefined ? 'nuevo(s)' : 'detectado(s)';
+    msg.innerHTML = `<b>${escapeHtml(r.job)}</b>: ${r.detectados} caso(s) ${nuevos} · ${r.enviados} email(s) enviado(s)` +
+      (r.simulados ? ` · ${r.simulados} simulado(s)` : '') + (r.fallidos ? ` · ${r.fallidos} fallido(s)` : '') +
+      (r.ya_en_mora ? ` · ${r.ya_en_mora} contrato(s) que ya estaban en mora (avisados antes)` : '');
     if (r.fallidos) msg.className = 'notice err';
     loadAutomatizacion();
   } catch (e) { msg.className = 'notice err'; msg.textContent = e.detail || 'Error al ejecutar el job.'; }
